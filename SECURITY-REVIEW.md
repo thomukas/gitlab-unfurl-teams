@@ -30,6 +30,7 @@ authorization authority for every project.
 | What can a compromised instance do? | Read what a currently signed-in user can already read. Egress policy limits reach further. |
 | How do we revoke one user? | The user revokes the authorization in GitLab, or an administrator deletes the Bot Service OAuth connection. No code change, no redeploy. |
 | Does it let someone enumerate private projects? | No. `403` and `404` produce a byte-identical response. |
+| What runs where? | A Node HTTP server in the deployer's own subscription. Deployable as a zip to a managed Node runtime or as a container — no registry required either way. |
 | Does it work without installing the app? | No, deliberately. `supportsAnonymizedPayloads` is absent. |
 
 ---
@@ -86,7 +87,7 @@ Both are in the rejection corpus in `packages/core/test/url-validator.test.ts`.
 ## What is and is not stored
 
 The application has no intentional persistent datastore. Operational
-infrastructure — container logs, load balancer logs, platform telemetry, error
+infrastructure — application logs, load balancer logs, platform telemetry, error
 tracing — may transiently process request metadata under your hosting
 provider's retention policy.
 

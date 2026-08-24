@@ -130,7 +130,8 @@ See [`SECURITY-REVIEW.md`](SECURITY-REVIEW.md).
 │ YOUR INFRASTRUCTURE   ·   pick one, the code is identical                  │
 │                                                                            │
 │   AWS                     Azure                      GCP                   │
-│   Lambda + Function URL   Container Apps / Web App   Cloud Run             │
+│   Lambda +                App Service (zip)          Cloud Run or          │
+│   Function URL            or Container Apps          any Node host         │
 │   hosts/aws               hosts/azure                hosts/gcp             │
 │                                                                            │
 │ ┌──────────────────────────────────────────────────────────────┐           │
@@ -268,14 +269,24 @@ can.
 Copy `.env.example` and fill it in. In production, supply `BOT_PASSWORD`
 through your platform's secret manager rather than a literal value.
 
-| Cloud | Target | Entry point |
+| Cloud | Entry point | Runs as |
 |---|---|---|
-| AWS | Lambda + Function URL | `hosts/aws` |
-| Azure | Container Apps | `hosts/azure` |
-| GCP | Cloud Run | `hosts/gcp` |
+| AWS | `hosts/aws` | Lambda + Function URL |
+| Azure | `hosts/azure` | App Service (zip deploy), or Container Apps |
+| GCP | `hosts/gcp` | Cloud Run, or any Node host |
 
-All three run the same code. The portable unit is a container, not a function,
-because Hono publishes no Azure Functions or GCP adapter.
+**The artifact is a Node HTTP server listening on `$PORT`**, not a container.
+`hosts/azure` and `hosts/gcp` are the same eight lines of `@hono/node-server`, so
+they run anywhere Node runs: a zip deploy to App Service's Node runtime, a
+container on Container Apps or Cloud Run, a VM, or a PaaS of your choosing. You
+do not need a container registry.
+
+AWS is the exception, and gets a thin `hono/aws-lambda` adapter instead, because
+Lambda's handler contract is not an HTTP listener.
+
+What Hono does *not* publish is an Azure Functions or GCP Cloud Functions
+adapter. That rules out the serverless-function path on those two clouds. It
+does not require a container.
 
 Point your Azure Bot's messaging endpoint at `https://<your-host>/api/messages`.
 
