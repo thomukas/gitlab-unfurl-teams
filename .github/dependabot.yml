@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # The two framework dependencies are the volatile ones: Microsoft archived
+  # botbuilder-js in January 2026 and replaced it with teams.ts. Keep them
+  # visible rather than discovering a rewrite late.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  # Actions are pinned to SHAs, which only Dependabot can practically update.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
