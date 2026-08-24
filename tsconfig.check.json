@@ -1,0 +1,27 @@
+{
+  // Typechecks everything the build graph does not: tests, tools and the
+  // manifest builder. The per-package tsconfigs include only src/**, so
+  // without this a type error in a test file goes unnoticed.
+  //
+  // Not composite and emits nothing — it exists purely to fail the build.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "baseUrl": ".",
+    "paths": {
+      "@gitlab-unfurl-teams/core": ["./packages/core/src/index.ts"],
+      "@gitlab-unfurl-teams/app": ["./packages/app/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "hosts/*/src/**/*.ts",
+    "hosts/*/test/**/*.ts",
+    "manifest/test/**/*.ts",
+    "tools/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

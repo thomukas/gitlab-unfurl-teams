@@ -24,6 +24,10 @@ const payload = {
   updated_at: '2026-08-02T10:00:00Z',
 };
 
+/** Matches fetch's signature so `mock.calls` is a correctly typed tuple. */
+const spyFetch = (impl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>) =>
+  vi.fn(impl);
+
 const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
     status,
@@ -34,7 +38,7 @@ const okFetch = (async () => jsonResponse(payload)) as unknown as typeof fetch;
 
 describe('fetchEntity', () => {
   it('calls the configured origin, never a host from the ref (I2)', async () => {
-    const spy = vi.fn(async () => jsonResponse(payload));
+    const spy = spyFetch(async () => jsonResponse(payload));
     await fetchEntity(ref, 'tok', cfg, spy as unknown as typeof fetch);
     const url = String(spy.mock.calls[0]![0]);
     expect(url.startsWith('https://gitlab.example.com/api/v4/')).toBe(true);
@@ -43,15 +47,15 @@ describe('fetchEntity', () => {
   });
 
   it('sets redirect:error so a redirect cannot move the token (I3)', async () => {
-    const spy = vi.fn(async () => jsonResponse(payload));
+    const spy = spyFetch(async () => jsonResponse(payload));
     await fetchEntity(ref, 'tok', cfg, spy as unknown as typeof fetch);
     expect(spy.mock.calls[0]![1]).toMatchObject({ redirect: 'error' });
   });
 
   it('sends the bearer token', async () => {
-    const spy = vi.fn(async () => jsonResponse(payload));
+    const spy = spyFetch(async () => jsonResponse(payload));
     await fetchEntity(ref, 'tok', cfg, spy as unknown as typeof fetch);
-    const init = spy.mock.calls[0]![1] as RequestInit;
+    const init = spy.mock.calls[0]![1]!;
     expect(new Headers(init.headers).get('authorization')).toBe('Bearer tok');
   });
 
@@ -121,13 +125,13 @@ describe('fetchEntity', () => {
   });
 
   it('makes exactly one request per call (I13)', async () => {
-    const spy = vi.fn(async () => jsonResponse(payload));
+    const spy = spyFetch(async () => jsonResponse(payload));
     await fetchEntity(ref, 'tok', cfg, spy as unknown as typeof fetch);
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it('routes an epic to /groups, not /projects', async () => {
-    const spy = vi.fn(async () => jsonResponse(payload));
+    const spy = spyFetch(async () => jsonResponse(payload));
     const epic = { kind: 'epic', namespacePath: 'acme', iid: 17 } as const;
     await fetchEntity(epic, 'tok', cfg, spy as unknown as typeof fetch);
     const url = String(spy.mock.calls[0]![0]);
@@ -135,7 +139,7 @@ describe('fetchEntity', () => {
   });
 
   it('encodes a nested group path for an epic', async () => {
-    const spy = vi.fn(async () => jsonResponse(payload));
+    const spy = spyFetch(async () => jsonResponse(payload));
     const epic = { kind: 'epic', namespacePath: 'acme/platform', iid: 3 } as const;
     await fetchEntity(epic, 'tok', cfg, spy as unknown as typeof fetch);
     expect(String(spy.mock.calls[0]![0])).toContain(encodeURIComponent('acme/platform'));

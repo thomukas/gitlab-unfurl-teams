@@ -49,3 +49,4 @@ describe('safeLogFields', () => {
     expect(bare.namespace).toBeUndefined();
   });
 });
+
