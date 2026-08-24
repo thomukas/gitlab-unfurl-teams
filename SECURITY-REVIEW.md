@@ -63,6 +63,13 @@ The validator proves the pasted origin equals the configured origin, then
 discards it. The client cannot be pointed anywhere by pasted input, because it
 never receives a destination.
 
+**The URL shape and the entity kind must agree.** Epics use a second shape —
+`/groups/{namespace}/-/epics/17` — so the validator cannot simply treat
+everything before `/-/` as a project path. A merge request inside `/groups/`, an
+epic outside it, or a project whose namespace merely *starts* with those letters
+(`/groupsX/proj/-/epics/1`) are all rejected. The `/groups/` prefix is matched
+exactly rather than by string prefix, for that last reason.
+
 **Two checks exist because of verified parser behaviour, not caution.**
 
 - `https://evil.com@gitlab.example.com/…` parses with an origin **equal to**

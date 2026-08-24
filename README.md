@@ -6,6 +6,25 @@ card instead of a sign-in page.
 Each person sees exactly what they can already see in GitLab, because the card
 is built with their own OAuth token. There is no shared service token.
 
+## What it recognises
+
+| Kind | URL shape | Card reads |
+|---|---|---|
+| Merge request | `/{namespace}/{project}/-/merge_requests/412` | `!412` |
+| Issue | `/{namespace}/{project}/-/issues/88` | `#88` |
+| Epic | `/groups/{namespace}/-/epics/17` | `&17` |
+
+The sigils are GitLab's own reference syntax, so the card needs no separate type
+label. Note that epics live under `/groups/` and carry a **group** path rather
+than a project path — a different URL shape, not just a different word.
+
+Epics are a Premium feature on GitLab.com. On a Free namespace the API returns
+404 and you get no card, which is the correct outcome rather than an error.
+
+Anything else — commits, snippets, jobs, a project's home page — is not
+recognised and produces no card. Teams then falls back to its own generic
+preview.
+
 ```
 https://gitlab.example.com/platform/api/-/merge_requests/412
 ```
@@ -13,9 +32,8 @@ becomes
 
 ```
 ┌────────────────────────────────────────┐
-│ Merge request                          │
-│ Add rate limiting to the public API    │
-│ platform/api!412                       │
+│ !412 · Add rate limiting to the API    │
+│ platform/api                           │
 │                                        │
 │ State      opened                      │
 │ Author     Ada Lovelace                │

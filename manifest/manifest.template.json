@@ -14,8 +14,8 @@
     "full": "GitLab link unfurling for Microsoft Teams"
   },
   "description": {
-    "short": "Preview GitLab merge requests and issues in Teams.",
-    "full": "Turns a pasted GitLab merge request or issue link into a card, using your own GitLab account. Each person sees only what they can already see in GitLab."
+    "short": "Preview GitLab merge requests, issues and epics in Teams.",
+    "full": "Turns a pasted GitLab merge request, issue or epic link into a card, using your own GitLab account. Each person sees only what they can already see in GitLab."
   },
   "icons": { "color": "color.png", "outline": "outline.png" },
   "accentColor": "#FC6D26",
