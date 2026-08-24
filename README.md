@@ -268,8 +268,12 @@ BOT_ID=<your-bot-id> GITLAB_ORIGIN=https://gitlab.example.com \
   node manifest/build-manifest.mjs
 ```
 
-Zip `manifest/build/manifest.json` with `color.png` and `outline.png`, then
-upload it in **Teams admin center → Teams apps → Manage apps → Upload new app**.
+That writes `manifest/build/gitlab-unfurl-teams.zip`, containing the manifest and
+both icons at the archive root, which is what Teams expects. Upload it in
+**Teams admin center → Teams apps → Manage apps → Upload new app**.
+
+The `GITLAB_ORIGIN` you build with is baked into the manifest as the domain Teams
+watches for. Rebuild and re-upload if you change instance.
 
 ---
 
