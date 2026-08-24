@@ -1,0 +1,32 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "0.1.0",
+  "id": "{{BOT_ID}}",
+  "developer": {
+    "name": "{{DEVELOPER_NAME}}",
+    "websiteUrl": "{{WEBSITE_URL}}",
+    "privacyUrl": "{{PRIVACY_URL}}",
+    "termsOfUseUrl": "{{TERMS_URL}}"
+  },
+  "name": {
+    "short": "GitLab Unfurl",
+    "full": "GitLab link unfurling for Microsoft Teams"
+  },
+  "description": {
+    "short": "Preview GitLab merge requests and issues in Teams.",
+    "full": "Turns a pasted GitLab merge request or issue link into a card, using your own GitLab account. Each person sees only what they can already see in GitLab."
+  },
+  "icons": { "color": "color.png", "outline": "outline.png" },
+  "accentColor": "#FC6D26",
+  "composeExtensions": [
+    {
+      "botId": "{{BOT_ID}}",
+      "messageHandlers": [
+        { "type": "link", "value": { "domains": ["{{GITLAB_HOST}}"] } }
+      ]
+    }
+  ],
+  "permissions": ["identity"],
+  "validDomains": ["{{GITLAB_HOST}}"]
+}

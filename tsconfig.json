@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/app" },
+    { "path": "./hosts/aws" },
+    { "path": "./hosts/azure" },
+    { "path": "./hosts/gcp" }
+  ]
+}
