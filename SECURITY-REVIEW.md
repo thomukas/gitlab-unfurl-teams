@@ -121,3 +121,14 @@ it. These need live Azure resources and cannot be built or verified locally.
 **Both credential stubs deny.** A deployment shipped in this state refuses every
 request rather than serving one unauthenticated. `hosts/aws/test/deps.test.ts`
 asserts this, so a future change that flips a stub to allow will fail the suite.
+
+This is deliberate sequencing, not an oversight. `verifyJwt` and `lookupToken`
+are the two security-critical seams in the application, and writing them as part
+of an infrastructure task is how a JWT check ends up cursory. If you provision
+the hosting and get a 401, that is the design working — not a misconfiguration
+to route around.
+
+On secrets (I15): the bot password should reach the process as a managed-secret
+reference resolved by the platform, never as a literal in app settings, a
+deployment manifest, an image or CI output. On Azure that is a Key Vault
+reference; the equivalent exists on the other two clouds.

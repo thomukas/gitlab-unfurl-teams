@@ -251,8 +251,26 @@ can.
 
 ### 2. Create the Azure Bot Service OAuth connection
 
-1. Create an **Azure Bot** resource. Note the Microsoft App ID and secret.
+> **One deployment serves one tenant.** Multi-tenant bot creation was
+> [deprecated on 31 July 2025](https://learn.microsoft.com/azure/bot-service/abs-quickstart)
+> and is now refused outright — `--app-type MultiTenant` fails. Register the
+> Entra app as **single-tenant** (`AzureADMyOrg`) and create the bot as
+> **SingleTenant**. Since this app can never be published to the Teams Store
+> (see above), one instance cannot serve several organisations. Each
+> organisation deploys its own, which is the intended model anyway.
+>
+> `UserAssignedMSI` is the other supported type and removes `BOT_PASSWORD`
+> entirely. It only works on Azure compute, so it trades the multi-cloud story
+> for one fewer secret. Worth it if you are on Azure and staying there.
+
+1. Create an **Azure Bot** resource with app type **SingleTenant**. Note the
+   Microsoft App ID, the tenant ID and the secret.
 2. Open **Settings → Configuration → Add OAuth Connection Settings**.
+   **Use the portal, not the CLI.** `az bot authsetting create` calls
+   `Microsoft.BotService/listAuthServiceProviders` at *subscription* scope, which
+   many organisations deny to a resource-group-scoped account. It fails even
+   with every parameter supplied. The portal path needs no subscription-scope
+   permission — only ownership of the bot.
 3. Name the connection, for example `gitlab`.
 4. Choose service provider **Generic Oauth 2**.
 5. Enter the Application ID and Secret from step 1.
@@ -267,7 +285,15 @@ can.
 ### 3. Configure and deploy
 
 Copy `.env.example` and fill it in. In production, supply `BOT_PASSWORD`
-through your platform's secret manager rather than a literal value.
+through your platform's secret manager rather than a literal value. On Azure
+that means a Key Vault reference in app settings, which the platform resolves at
+runtime — the portal shows the setting as **Resolved** and the literal never
+appears in configuration, a deployment manifest or a log.
+
+Two things about vaults that are painful to discover later: a vault is either
+**RBAC** or **access-policy** mode, and that is chosen at creation and awkward to
+change afterwards. If you cannot get a role assignment on an existing vault,
+creating your own is usually faster than waiting for one.
 
 | Cloud | Entry point | Runs as |
 |---|---|---|
