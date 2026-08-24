@@ -14,10 +14,10 @@
     "dev": "tsx tools/dev-server.ts"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vitest": "4.1.11",
-    "@types/node": "24.10.1",
-    "tsx": "4.21.1",
+    "@types/node": "26.2.0",
+    "tsx": "4.23.12",
     "@hono/node-server": "2.1.1"
   }
 }
