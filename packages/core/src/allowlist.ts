@@ -9,10 +9,10 @@
  * authoritative for access (I8): a user who cannot see a project gets no
  * card whether or not the allowlist permits it.
  */
-export function isAllowed(projectPath: string, allowlist: readonly string[]): boolean {
+export function isAllowed(namespacePath: string, allowlist: readonly string[]): boolean {
   if (allowlist.length === 0) return true;
 
-  const actual = projectPath.split('/');
+  const actual = namespacePath.split('/');
 
   return allowlist.some((entry) => {
     const wanted = entry.split('/');

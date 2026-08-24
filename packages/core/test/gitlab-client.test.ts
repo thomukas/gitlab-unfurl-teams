@@ -10,7 +10,7 @@ const cfg: CoreConfig = {
   maxResponseBytes: 1024,
 };
 
-const ref: GitLabRef = { kind: 'merge_request', projectPath: 'g/p', iid: 42 };
+const ref: GitLabRef = { kind: 'merge_request', namespacePath: 'g/p', iid: 42 };
 
 const payload = {
   title: 'Add the thing',
@@ -62,7 +62,7 @@ describe('fetchEntity', () => {
         kind: 'merge_request',
         title: 'Add the thing',
         state: 'opened',
-        projectPath: 'g/p',
+        namespacePath: 'g/p',
         iid: 42,
         webUrl: 'https://gitlab.example.com/g/p/-/merge_requests/42',
         author: { name: 'Ada' },
@@ -124,6 +124,21 @@ describe('fetchEntity', () => {
     const spy = vi.fn(async () => jsonResponse(payload));
     await fetchEntity(ref, 'tok', cfg, spy as unknown as typeof fetch);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes an epic to /groups, not /projects', async () => {
+    const spy = vi.fn(async () => jsonResponse(payload));
+    const epic = { kind: 'epic', namespacePath: 'acme', iid: 17 } as const;
+    await fetchEntity(epic, 'tok', cfg, spy as unknown as typeof fetch);
+    const url = String(spy.mock.calls[0]![0]);
+    expect(url).toBe('https://gitlab.example.com/api/v4/groups/acme/epics/17');
+  });
+
+  it('encodes a nested group path for an epic', async () => {
+    const spy = vi.fn(async () => jsonResponse(payload));
+    const epic = { kind: 'epic', namespacePath: 'acme/platform', iid: 3 } as const;
+    await fetchEntity(epic, 'tok', cfg, spy as unknown as typeof fetch);
+    expect(String(spy.mock.calls[0]![0])).toContain(encodeURIComponent('acme/platform'));
   });
 
   it('tolerates a missing pipeline', async () => {

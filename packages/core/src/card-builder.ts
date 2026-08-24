@@ -16,14 +16,15 @@ const URL_LIKE = /\b[a-z][a-z0-9+.-]*:\/\/\S+|\bjavascript:\S*|\bdata:\S*/gi;
 const MARKDOWN_DELIMITERS = /[[\]()]/g;
 const MARKDOWN_EMPHASIS = /[*_`~|>#\\]/g;
 
-const KIND_LABEL: Readonly<Record<Entity['kind'], string>> = {
-  merge_request: 'Merge request',
-  issue: 'Issue',
-};
-
+/**
+ * GitLab's own reference sigils. A GitLab user reads `!412` as merge
+ * request 412 without being told, which is why the card carries no
+ * separate "Merge request" label.
+ */
 const SIGIL: Readonly<Record<Entity['kind'], string>> = {
   merge_request: '!',
   issue: '#',
+  epic: '&',
 };
 
 /**
@@ -64,7 +65,6 @@ function safeUrl(raw: string, config: CoreConfig): string | null {
 
 export function buildCard(entity: Entity, config: CoreConfig): object {
   const url = safeUrl(entity.webUrl, config);
-  const reference = `${text(entity.projectPath, MAX_PROJECT_PATH)}${SIGIL[entity.kind]}${entity.iid}`;
 
   const facts: { title: string; value: string }[] = [
     { title: 'State', value: text(entity.state, MAX_STATE) },
@@ -95,26 +95,21 @@ export function buildCard(entity: Entity, config: CoreConfig): object {
     facts.push({ title: 'Pipeline', value: text(entity.pipeline.status, MAX_STATE) });
   }
 
+  const headline = `${SIGIL[entity.kind]}${entity.iid}  ·  ${text(entity.title, MAX_TITLE)}`;
+
   return {
     $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
     type: 'AdaptiveCard',
     version: '1.3',
     body: [
+      { type: 'TextBlock', text: headline, weight: 'Bolder', size: 'Medium', wrap: true },
       {
         type: 'TextBlock',
-        text: KIND_LABEL[entity.kind],
+        text: text(entity.namespacePath, MAX_PROJECT_PATH),
         isSubtle: true,
         spacing: 'None',
         wrap: false,
       },
-      {
-        type: 'TextBlock',
-        text: text(entity.title, MAX_TITLE),
-        weight: 'Bolder',
-        size: 'Medium',
-        wrap: true,
-      },
-      { type: 'TextBlock', text: reference, isSubtle: true, spacing: 'None', wrap: false },
       { type: 'FactSet', facts },
     ],
     ...(url === null ? {} : { actions: [{ type: 'Action.OpenUrl', title: 'Open in GitLab', url }] }),
@@ -126,7 +121,7 @@ function buildPreview(entity: Entity): object {
     contentType: 'application/vnd.microsoft.card.thumbnail',
     content: {
       title: text(entity.title, MAX_TITLE),
-      text: `${text(entity.projectPath, MAX_PROJECT_PATH)}${SIGIL[entity.kind]}${entity.iid}`,
+      text: `${text(entity.namespacePath, MAX_PROJECT_PATH)}${SIGIL[entity.kind]}${entity.iid}`,
     },
   };
 }

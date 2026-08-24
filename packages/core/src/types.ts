@@ -1,4 +1,17 @@
-export type EntityKind = 'merge_request' | 'issue';
+export type EntityKind = 'merge_request' | 'issue' | 'epic';
+
+/**
+ * Which GitLab API namespace an entity lives under. Merge requests and
+ * issues belong to a project; epics belong to a group. The URL shapes
+ * differ too, so this is not cosmetic.
+ */
+export type Scope = 'project' | 'group';
+
+export const SCOPE_OF: Readonly<Record<EntityKind, Scope>> = {
+  merge_request: 'project',
+  issue: 'project',
+  epic: 'group',
+};
 
 /**
  * A validated reference to a GitLab entity.
@@ -10,7 +23,8 @@ export type EntityKind = 'merge_request' | 'issue';
  */
 export interface GitLabRef {
   readonly kind: EntityKind;
-  readonly projectPath: string;
+  /** Project path for merge requests and issues; group path for epics. */
+  readonly namespacePath: string;
   readonly iid: number;
 }
 
@@ -33,7 +47,7 @@ export interface Entity {
   readonly kind: EntityKind;
   readonly title: string;
   readonly state: string;
-  readonly projectPath: string;
+  readonly namespacePath: string;
   readonly iid: number;
   readonly webUrl: string;
   readonly author: { readonly name: string };

@@ -36,7 +36,7 @@ export function safeLogFields(input: SafeLogInput): Record<string, string | numb
 
   if (input.ref !== undefined) {
     fields.entity = input.ref.kind;
-    fields.project = hashProjectPath(input.ref.projectPath);
+    fields.namespace = hashProjectPath(input.ref.namespacePath);
   }
 
   return fields;

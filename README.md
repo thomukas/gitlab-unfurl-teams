@@ -1,7 +1,7 @@
 # gitlab-unfurl-teams
 
-Paste a GitLab merge request or issue link into Microsoft Teams and get a card
-instead of a sign-in page.
+Paste a GitLab merge request, issue or epic link into Microsoft Teams and get a
+card instead of a sign-in page.
 
 Each person sees exactly what they can already see in GitLab, because the card
 is built with their own OAuth token. There is no shared service token.

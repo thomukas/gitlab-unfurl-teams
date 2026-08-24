@@ -14,7 +14,7 @@ const base: Entity = {
   kind: 'merge_request',
   title: 'Add the thing',
   state: 'opened',
-  projectPath: 'g/p',
+  namespacePath: 'g/p',
   iid: 42,
   webUrl: 'https://gitlab.example.com/g/p/-/merge_requests/42',
   author: { name: 'Ada' },
@@ -32,14 +32,36 @@ describe('buildCard', () => {
     expect(buildCard(base, cfg)).toMatchObject({ type: 'AdaptiveCard', version: '1.3' });
   });
 
-  it('includes the title and the project reference', () => {
+  it('leads with the sigil and number, then the title', () => {
     const serialised = json(buildCard(base, cfg));
+    expect(serialised).toContain('!42');
     expect(serialised).toContain('Add the thing');
-    expect(serialised).toContain('g/p!42');
   });
 
   it('uses the issue sigil for issues', () => {
-    expect(json(buildCard({ ...base, kind: 'issue' }, cfg))).toContain('g/p#42');
+    expect(json(buildCard({ ...base, kind: 'issue' }, cfg))).toContain('#42');
+  });
+
+  it('uses the epic sigil for epics', () => {
+    expect(json(buildCard({ ...base, kind: 'epic' }, cfg))).toContain('&42');
+  });
+
+  it('puts the project path on its own line', () => {
+    const body = (buildCard(base, cfg) as { body: { text?: string }[] }).body;
+    expect(body[1]!.text).toBe('g/p');
+  });
+
+  // The sigil already tells a GitLab user the type, so the label would
+  // be a wasted line in a card people scan.
+  it('carries no redundant type label', () => {
+    const serialised = json(buildCard(base, cfg));
+    expect(serialised).not.toContain('Merge request');
+    expect(json(buildCard({ ...base, kind: 'issue' }, cfg))).not.toContain('"Issue"');
+  });
+
+  it('uses three body elements, not four', () => {
+    const body = (buildCard(base, cfg) as { body: unknown[] }).body;
+    expect(body).toHaveLength(3);
   });
 
   // I12: TextBlock renders markdown including links, so a hostile title
@@ -135,6 +157,13 @@ describe('buildUnfurlResponse', () => {
       type: 'setCachePolicy',
       value: '{"type":"no-cache"}',
     });
+  });
+
+  it('keeps the full canonical reference in the compose-box preview', () => {
+    const preview = (response.composeExtension.attachments[0] as unknown as {
+      preview: { content: { text: string } };
+    }).preview;
+    expect(preview.content.text).toBe('g/p!42');
   });
 
   it('uses the adaptive card content type', () => {

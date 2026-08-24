@@ -1,4 +1,5 @@
 import type { CoreConfig } from './config.js';
+import { SCOPE_OF } from './types.js';
 import type { Entity, GitLabRef } from './types.js';
 
 export type FetchFailure = 'not-found' | 'timeout' | 'too-large' | 'network' | 'bad-response';
@@ -10,6 +11,13 @@ export type FetchResult =
 const API_SEGMENT: Readonly<Record<GitLabRef['kind'], string>> = {
   merge_request: 'merge_requests',
   issue: 'issues',
+  epic: 'epics',
+};
+
+/** Epics are read from /groups/:id/epics/:iid, everything else from /projects. */
+const API_ROOT: Readonly<Record<'project' | 'group', string>> = {
+  project: 'projects',
+  group: 'groups',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -84,7 +92,7 @@ function toEntity(ref: GitLabRef, raw: unknown): Entity | null {
     kind: ref.kind,
     title,
     state,
-    projectPath: ref.projectPath,
+    namespacePath: ref.namespacePath,
     iid: ref.iid,
     webUrl,
     author: { name: readName(raw.author) },
@@ -111,8 +119,9 @@ export async function fetchEntity(
   config: CoreConfig,
   fetchImpl: typeof fetch = fetch,
 ): Promise<FetchResult> {
-  const project = encodeURIComponent(ref.projectPath);
-  const url = `${config.origin}/api/v4/projects/${project}/${API_SEGMENT[ref.kind]}/${ref.iid}`;
+  const namespace = encodeURIComponent(ref.namespacePath);
+  const root = API_ROOT[SCOPE_OF[ref.kind]];
+  const url = `${config.origin}/api/v4/${root}/${namespace}/${API_SEGMENT[ref.kind]}/${ref.iid}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => {

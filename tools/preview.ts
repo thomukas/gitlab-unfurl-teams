@@ -30,7 +30,7 @@ const SAMPLE: Entity = {
   kind: 'merge_request',
   title: 'Add rate limiting to the public API',
   state: 'opened',
-  projectPath: 'platform/api',
+  namespacePath: 'platform/api',
   iid: 412,
   webUrl: 'https://gitlab.com/platform/api/-/merge_requests/412',
   author: { name: 'Ada Lovelace' },

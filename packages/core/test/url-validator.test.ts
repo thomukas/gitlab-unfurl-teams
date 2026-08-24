@@ -16,21 +16,21 @@ describe('validateUrl: accepts', () => {
   it('a merge request', () => {
     expect(check('https://gitlab.example.com/group/proj/-/merge_requests/42')).toEqual({
       ok: true,
-      ref: { kind: 'merge_request', projectPath: 'group/proj', iid: 42 },
+      ref: { kind: 'merge_request', namespacePath: 'group/proj', iid: 42 },
     });
   });
 
   it('an issue', () => {
     expect(check('https://gitlab.example.com/group/proj/-/issues/7')).toEqual({
       ok: true,
-      ref: { kind: 'issue', projectPath: 'group/proj', iid: 7 },
+      ref: { kind: 'issue', namespacePath: 'group/proj', iid: 7 },
     });
   });
 
   it('a nested subgroup path', () => {
     expect(check('https://gitlab.example.com/a/b/c/proj/-/issues/1')).toMatchObject({
       ok: true,
-      ref: { projectPath: 'a/b/c/proj' },
+      ref: { namespacePath: 'a/b/c/proj' },
     });
   });
 
@@ -52,6 +52,20 @@ describe('validateUrl: accepts', () => {
     expect(check('https://gitlab.example.com/g/p/-/issues/3?foo=bar')).toMatchObject({
       ok: true,
       ref: { iid: 3 },
+    });
+  });
+
+  it('an epic, which lives under /groups/ and uses a group path', () => {
+    expect(check('https://gitlab.example.com/groups/acme/-/epics/17')).toEqual({
+      ok: true,
+      ref: { kind: 'epic', namespacePath: 'acme', iid: 17 },
+    });
+  });
+
+  it('an epic in a nested subgroup', () => {
+    expect(check('https://gitlab.example.com/groups/acme/platform/-/epics/3')).toMatchObject({
+      ok: true,
+      ref: { kind: 'epic', namespacePath: 'acme/platform' },
     });
   });
 
@@ -90,6 +104,13 @@ describe('validateUrl: rejects (the hostile-input corpus)', () => {
     ['https://gitlab.example.com/g/p/-/issues/../../../secret', 'shape'],
     ['https://gitlab.example.com/g/p/-/issues/%2e%2e/%2e%2e/secret', 'shape'],
     ['https://gitlab.example.com/g/p/-/snippets/1', 'shape'],
+    // The URL shape and the entity kind must agree.
+    ['https://gitlab.example.com/g/p/-/epics/1', 'shape'],
+    ['https://gitlab.example.com/groups/acme/-/issues/1', 'shape'],
+    ['https://gitlab.example.com/groups/acme/-/merge_requests/1', 'shape'],
+    // A project whose namespace merely starts with those letters.
+    ['https://gitlab.example.com/groupsX/proj/-/epics/1', 'shape'],
+    ['https://gitlab.example.com/groups/-/epics/1', 'shape'],
     ['https://gitlab.example.com/g/p/-/commit/abc123', 'shape'],
     ['https://gitlab.example.com/proj/-/issues/1', 'shape'],
     ['https://gitlab.example.com/g/p/-/issues', 'iid'],
@@ -122,7 +143,7 @@ describe('validateUrl: the returned ref carries no host (I2)', () => {
     const result = validateUrl('https://gitlab.example.com/g/p/-/issues/1', cfg);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(Object.keys(result.ref).sort()).toEqual(['iid', 'kind', 'projectPath']);
+      expect(Object.keys(result.ref).sort()).toEqual(['iid', 'kind', 'namespacePath']);
     }
   });
 });

@@ -58,7 +58,7 @@ authorization authority for every project.
 
 ## Two design decisions worth your attention
 
-**The validated reference carries no host.** `GitLabRef` is `{ kind, projectPath, iid }`.
+**The validated reference carries no host.** `GitLabRef` is `{ kind, namespacePath, iid }`.
 The validator proves the pasted origin equals the configured origin, then
 discards it. The client cannot be pointed anywhere by pasted input, because it
 never receives a destination.
@@ -84,7 +84,7 @@ tracing — may transiently process request metadata under your hosting
 provider's retention policy.
 
 The application MUST NOT log OAuth tokens, `Authorization` headers, full GitLab
-URLs, request bodies or GitLab response bodies. `projectPath` is hashed, because
+URLs, request bodies or GitLab response bodies. `namespacePath` is hashed, because
 a path such as `/acquisition/project-x/` is itself confidential business
 information. The entity number is dropped entirely, since it would narrow the
 hash to a single item.
@@ -92,7 +92,7 @@ hash to a single item.
 A log line looks like this:
 
 ```
-{"host":"gitlab.example.com","outcome":"ok","latency_ms":182,"entity":"merge_request","project":"a3f9c1e40b27"}
+{"host":"gitlab.example.com","outcome":"ok","latency_ms":182,"entity":"merge_request","namespace":"a3f9c1e40b27"}
 ```
 
 ---

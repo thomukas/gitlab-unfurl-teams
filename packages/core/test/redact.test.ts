@@ -17,7 +17,7 @@ describe('hashProjectPath', () => {
 
 describe('safeLogFields', () => {
   const fields = safeLogFields({
-    ref: { kind: 'merge_request', projectPath: 'acquisition/project-x', iid: 42 },
+    ref: { kind: 'merge_request', namespacePath: 'acquisition/project-x', iid: 42 },
     origin: 'https://gitlab.example.com',
     outcome: 'ok',
     latencyMs: 182,
@@ -46,6 +46,6 @@ describe('safeLogFields', () => {
       latencyMs: 1,
     });
     expect(bare.entity).toBeUndefined();
-    expect(bare.project).toBeUndefined();
+    expect(bare.namespace).toBeUndefined();
   });
 });
