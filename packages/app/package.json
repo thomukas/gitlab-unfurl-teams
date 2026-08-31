@@ -9,6 +9,6 @@
   "scripts": { "build": "tsc -b" },
   "dependencies": {
     "@gitlab-unfurl-teams/core": "workspace:*",
-    "hono": "4.13.3"
+    "hono": "4.13.5"
   }
 }
