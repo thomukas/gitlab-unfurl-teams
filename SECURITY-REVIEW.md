@@ -2,9 +2,11 @@
 
 ## Release status
 
-This checkout is not approved for production. The host JWT and OAuth adapters
-are deny-only stubs. Local tests cover the implemented boundaries; they do not
-prove live Teams authentication or deployment controls.
+This checkout requires deployment acceptance testing before production approval.
+The shared host adapter verifies Connector JWTs and integrates the Microsoft
+OAuth token service. Offline tests verify real RSA signatures and mocked token
+service contracts; they do not prove live Teams authentication or cloud controls.
+Only Microsoft public-cloud, SingleTenant bots are supported.
 
 ## Sharing boundary
 
@@ -58,8 +60,10 @@ Microsoft documents token storage at
 | Confidential entity metadata withheld | `gitlab-client.test.ts`, `handler.test.ts` |
 | HTTPS, exact configured origin, no userinfo or encoded separators | `config.test.ts`, `url-validator.test.ts` |
 | API destination constructed from trusted configuration; redirects refused | `gitlab-client.test.ts` |
-| Only expected authenticated activity shape processed | `activity.test.ts`, `server.test.ts` |
-| Sender identity selects token | `handler.test.ts`; real token adapter still pending |
+| Connector signature, issuer, bot audience, lifetime, Teams key endorsement and service URL; tenant/recipient binding | `jwt.test.ts` |
+| Query-link and caller-bound account actions only | `activity.test.ts`, `handler.test.ts` |
+| 64 KiB inbound body, deadline, concurrency and per-user/process rate guards | `server.test.ts` |
+| Sender identity selects token | `handler.test.ts`; token-service tests bind user, connection and channel |
 | No preview cache reuse | `card-builder.test.ts` |
 | 403/404 have identical response bodies | `handler.test.ts`; not a guarantee of identical timing |
 | Sanitized and bounded card text and action URLs | `card-builder.test.ts` |
@@ -74,13 +78,28 @@ hashes of guessable project paths are not anonymization. Restrict log access.
 
 A user can revoke the grant under GitLab **Edit profile → Access → Applications**.
 Removing a Teams app does not establish that its GitLab authorization was revoked.
+The extension's **Disconnect GitLab** action removes only the authenticated
+caller's token-service connection after confirmation. It never accepts a target
+user from the action data. GitLab-side revocation is a separate step. A GitLab
+401 invalidates the stored token and returns a new sign-in action.
 Deleting the shared Azure Bot OAuth connection affects the entire integration;
-it is not a per-user revocation procedure. Per-user token-service disconnect and
-credential rotation require a tested operational procedure before rollout.
+it is not a per-user revocation procedure.
 
-Egress policy, managed secret injection, inbound request limits, production
-monitoring and release/deployment automation are not provided yet. CI includes
+The runtime enforces bounded network calls, input size, 40 concurrent invokes,
+30 invokes per user per minute and 600 per process per minute. These are local
+process guards; a shared gateway is needed for limits across replicas.
+`/healthz` is liveness. `/readyz` verifies JWKS availability and, in metadata mode,
+bot credential acquisition. It does not prove the OAuth connection or GitLab is
+reachable. Correlation IDs and fixed error categories are emitted without raw
+upstream errors. OAuth state/code validation is delegated to Microsoft's token
+service, with caller-bound sign-in links and code forwarding on resumed invokes.
+Egress policy, secret injection, production alerts and release/deployment
+automation still require deployment configuration. CI includes
 an audit and SAST workflow; secret-scanning configuration, SBOMs and any image
 scanning must be verified separately. Test live sign-in, refresh, revocation,
 restricted projects, cross-audience sharing and failure recovery in a dedicated
 tenant before deployment approval.
+
+Implementation references: [Connector authentication](https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-authentication),
+[Microsoft token-service protocol](https://github.com/microsoft/botbuilder-dotnet/blob/main/libraries/Swagger/TokenAPI.json),
+[OAuth regional endpoints](https://learn.microsoft.com/en-us/azure/bot-service/ref-oauth-redirect-urls).

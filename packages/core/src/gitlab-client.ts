@@ -2,7 +2,7 @@ import type { CoreConfig } from './config.js';
 import { SCOPE_OF } from './types.js';
 import type { Entity, GitLabRef } from './types.js';
 
-export type FetchFailure = 'not-found' | 'timeout' | 'too-large' | 'network' | 'bad-response' | 'restricted';
+export type FetchFailure = 'not-found' | 'timeout' | 'too-large' | 'network' | 'bad-response' | 'restricted' | 'unauthorized';
 
 export type FetchResult =
   | { readonly ok: true; readonly entity: Entity }
@@ -118,6 +118,7 @@ export async function fetchEntity(
   token: string,
   config: CoreConfig,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<FetchResult> {
   const namespace = encodeURIComponent(ref.namespacePath);
   const root = API_ROOT[SCOPE_OF[ref.kind]];
@@ -132,10 +133,11 @@ export async function fetchEntity(
     const response = await fetchImpl(url, {
       method: 'GET',
       redirect: 'error',
-      signal: controller.signal,
+      signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
       headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
     });
 
+    if (response.status === 401) return { ok: false, reason: 'unauthorized' };
     if (response.status === 403 || response.status === 404) {
       return { ok: false, reason: 'not-found' };
     }

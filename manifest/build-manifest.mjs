@@ -19,6 +19,7 @@ export function renderManifest(template, env) {
   const values = {
     BOT_ID: env.BOT_ID,
     GITLAB_HOST: origin.host,
+    OAUTH_HOST: new URL(env.OAUTH_ORIGIN ?? 'https://token.botframework.com').host,
     DEVELOPER_NAME: env.DEVELOPER_NAME ?? 'Unknown',
     WEBSITE_URL: env.WEBSITE_URL ?? 'https://example.com',
     PRIVACY_URL: env.PRIVACY_URL ?? 'https://example.com/privacy',

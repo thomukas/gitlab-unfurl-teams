@@ -15,8 +15,10 @@ project prefixes. Confidential issues and epics are withheld. Approval of a
 prefix is approval to share its non-confidential metadata in Teams; it is not
 recipient authorization. Leave link mode enabled if this sharing is unsuitable.
 
-**Implementation status:** authentication adapters are still deny-only stubs.
-This checkout is not a working production deployment yet. See the security pack.
+**Implementation status:** JWT verification and the Microsoft OAuth token-service
+flow are implemented with offline protocol tests. Live Teams sign-in, refresh,
+regional configuration and deployment acceptance testing are still required.
+See the security pack.
 
 ## What it recognises
 
@@ -271,12 +273,13 @@ can.
 > (see above), one instance cannot serve several organisations. Each
 > organisation deploys its own, which is the intended model anyway.
 >
-> `UserAssignedMSI` is the other supported type and removes `BOT_PASSWORD`
-> entirely. It only works on Azure compute, so it trades the multi-cloud story
-> for one fewer secret. Worth it if you are on Azure and staying there.
+> This runtime supports **SingleTenant** with a client secret for metadata mode.
+> `UserAssignedMSI` is not implemented; do not select it for this deployment.
+> Link mode verifies incoming JWTs without needing `BOT_PASSWORD`.
 
 1. Create an **Azure Bot** resource with app type **SingleTenant**. Note the
-   Microsoft App ID, the tenant ID and the secret.
+   Microsoft App ID (`BOT_ID`), tenant ID (`BOT_TENANT_ID`) and secret.
+   Enable the **Microsoft Teams** channel on the bot resource.
 2. Open **Settings → Configuration → Add OAuth Connection Settings**.
    **Use the portal, not the CLI.** `az bot authsetting create` calls
    `Microsoft.BotService/listAuthServiceProviders` at *subscription* scope, which

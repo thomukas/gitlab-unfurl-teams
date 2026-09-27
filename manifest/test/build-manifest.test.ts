@@ -18,7 +18,7 @@ describe('renderManifest', () => {
     expect(manifest.composeExtensions[0].messageHandlers[0].value.domains).toEqual([
       'gitlab.example.com',
     ]);
-    expect(manifest.validDomains).toEqual(['gitlab.example.com']);
+    expect(manifest.validDomains).toEqual(['gitlab.example.com', 'token.botframework.com']);
   });
 
   it('registers the exact host, never a wildcard', () => {

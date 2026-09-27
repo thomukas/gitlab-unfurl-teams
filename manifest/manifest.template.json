@@ -22,11 +22,16 @@
   "composeExtensions": [
     {
       "botId": "{{BOT_ID}}",
+      "commands": [{
+        "id": "disconnect", "type": "action", "title": "Disconnect GitLab",
+        "description": "Disconnect your GitLab account from this app.",
+        "context": ["compose"], "fetchTask": true
+      }],
       "messageHandlers": [
         { "type": "link", "value": { "domains": ["{{GITLAB_HOST}}"] } }
       ]
     }
   ],
   "permissions": ["identity"],
-  "validDomains": ["{{GITLAB_HOST}}"]
+  "validDomains": ["{{GITLAB_HOST}}", "{{OAUTH_HOST}}"]
 }

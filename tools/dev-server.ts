@@ -26,14 +26,17 @@ if (token === undefined || token === '') {
 const server = createServer({
   config: loadCoreConfig(process.env),
   lookupToken: async () => token,
-  verifyJwt: async () => true, // LOCAL ONLY
+  getSignInUrl: async () => { throw new Error('Not available in local dev'); },
+  signOut: async () => {},
+  ready: async () => {},
+  verifyJwt: async () => () => true, // LOCAL ONLY
   log: (fields) => {
     console.log(JSON.stringify(fields));
   },
 });
 
 const port = Number(process.env.PORT ?? 3978);
-serve({ fetch: server.fetch, port });
+serve({ fetch: server.fetch, port, hostname: '127.0.0.1' });
 
 console.log(`Local dev server on http://localhost:${port}`);
 console.log('WARNING: JWT validation is disabled. Local use only.\n');
