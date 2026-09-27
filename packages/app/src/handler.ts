@@ -7,13 +7,17 @@ import {
   type CoreConfig,
   type GitLabRef,
 } from '@gitlab-unfurl-teams/core';
+import { isRecord } from './http.js';
 import { checkActivity } from './activity.js';
 
-export type TokenLookup = (teamsUserId: string) => Promise<string | null>;
+export type TokenLookup = (teamsUserId: string, code?: string, signal?: AbortSignal) => Promise<string | null>;
 
 export interface HandlerDeps {
   readonly config: CoreConfig;
   readonly lookupToken: TokenLookup;
+  readonly getSignInUrl: (activity: unknown, signal?: AbortSignal) => Promise<string>;
+  readonly signOut: (userId: string, signal?: AbortSignal) => Promise<void>;
+  readonly signal?: AbortSignal;
   readonly fetchImpl?: typeof fetch;
   readonly log?: (fields: Record<string, string | number>) => void;
 }
@@ -39,14 +43,12 @@ export const EMPTY_RESPONSE: object = Object.freeze({
   }),
 });
 
-/** Shown until the user connects their own GitLab account. */
-export const AUTH_RESPONSE: object = Object.freeze({
-  composeExtension: Object.freeze({
-    type: 'auth',
-    attachmentLayout: 'list',
-    attachments: Object.freeze([]),
-  }),
-});
+/** The token service supplies a caller-bound URL; never reuse it for another user. */
+function authResponse(url: string): object {
+  return { composeExtension: { type: 'auth', suggestedActions: { actions: [
+    { type: 'openUrl', title: 'Connect your GitLab account', value: url },
+  ] } } };
+}
 
 /**
  * Order matters here, and it is a security property, not a style choice.
@@ -90,18 +92,52 @@ export async function handleQueryLink(activity: unknown, deps: HandlerDeps): Pro
     return buildLinkResponse(validated.ref, deps.config);
   }
 
-  const token = await deps.lookupToken(checked.userId);
+  const token = await deps.lookupToken(checked.userId, checked.code, deps.signal);
   if (token === null) {
     emit('auth-required', validated.ref);
-    return AUTH_RESPONSE;
+    return authResponse(await deps.getSignInUrl(activity, deps.signal));
   }
 
-  const result = await fetchEntity(validated.ref, token, deps.config, deps.fetchImpl);
+  const result = await fetchEntity(validated.ref, token, deps.config, deps.fetchImpl, deps.signal);
   if (!result.ok) {
     emit(`gitlab:${result.reason}`, validated.ref);
+    if (result.reason === 'unauthorized') {
+      // Cleanup is best-effort: a rejected GitLab grant still needs a sign-in action.
+      try { await deps.signOut(checked.userId, deps.signal); }
+      catch { emit('reconnect-cleanup-failed', validated.ref); }
+      return authResponse(await deps.getSignInUrl(activity, deps.signal));
+    }
     return EMPTY_RESPONSE;
   }
 
   emit('ok', validated.ref);
   return buildUnfurlResponse(result.entity, deps.config);
+}
+
+/** Account actions use only the authenticated caller, never an ID in action data. */
+export async function handleActivity(activity: unknown, deps: HandlerDeps): Promise<object> {
+  if (!isRecord(activity) || activity.type !== 'invoke' || activity.channelId !== 'msteams'
+    || !isRecord(activity.from) || typeof activity.from.id !== 'string' || !activity.from.id
+    || !isRecord(activity.value)) return EMPTY_RESPONSE;
+  const value = activity.value;
+  if (activity.name === 'signin/verifyState') {
+    if (typeof value.state !== 'string' || !value.state || value.state.length > 512) return EMPTY_RESPONSE;
+    const token = await deps.lookupToken(activity.from.id, value.state, deps.signal);
+    return { status: token ? 200 : 401 };
+  }
+  if (value.commandId === 'disconnect' && activity.name === 'composeExtension/fetchTask') {
+    return { task: { type: 'continue', value: { title: 'Disconnect GitLab', height: 'small', width: 'small',
+      card: { contentType: 'application/vnd.microsoft.card.adaptive', content: {
+        type: 'AdaptiveCard', version: '1.3',
+        body: [{ type: 'TextBlock', wrap: true, text: 'Disconnect your GitLab account from this app? Existing cards remain in Teams. To revoke the grant itself, also revoke Teams Unfurl in GitLab Authorized applications.' }],
+        actions: [{ type: 'Action.Submit', title: 'Disconnect', data: { confirm: true } }],
+      } },
+    } } };
+  }
+  if (value.commandId === 'disconnect' && activity.name === 'composeExtension/submitAction') {
+    if (!isRecord(value.data) || value.data.confirm !== true) return { task: { type: 'message', value: 'Disconnect cancelled.' } };
+    await deps.signOut(activity.from.id, deps.signal);
+    return { task: { type: 'message', value: 'Disconnected. Existing Teams cards remain. Revoke the grant in GitLab Authorized applications to remove authorization.' } };
+  }
+  return handleQueryLink(activity, deps);
 }

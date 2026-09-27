@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { handleQueryLink, EMPTY_RESPONSE, AUTH_RESPONSE } from '../src/handler.js';
+import { handleQueryLink, handleActivity, EMPTY_RESPONSE } from '../src/handler.js';
 import { loadCoreConfig } from '@gitlab-unfurl-teams/core';
+
+const authDeps = { getSignInUrl: async () => 'https://token.botframework.com/signin/test', signOut: async () => {} };
 
 const config = loadCoreConfig({ GITLAB_ORIGIN: 'https://gitlab.example.com', PREVIEW_MODE: 'metadata', PROJECT_ALLOWLIST: 'g,acquisition' });
 
@@ -33,7 +35,7 @@ const good = 'https://gitlab.example.com/g/p/-/issues/1';
 describe('handleQueryLink', () => {
   it('returns a card for a valid link and an authorized user', async () => {
     const res = (await handleQueryLink(activity(good), {
-      config,
+      ...authDeps, config,
       lookupToken: async () => 'tok',
       fetchImpl: okFetch,
     })) as { composeExtension: { type: string; attachments: { preview?: unknown }[] } };
@@ -44,22 +46,22 @@ describe('handleQueryLink', () => {
 
   it('returns the sign-in card when the user has no token', async () => {
     const res = await handleQueryLink(activity(good), {
-      config,
+      ...authDeps, config,
       lookupToken: async () => null,
       fetchImpl: okFetch,
     });
-    expect(res).toEqual(AUTH_RESPONSE);
+    expect(res).toMatchObject({ composeExtension: { type: 'auth', suggestedActions: { actions: [{ type: 'openUrl', value: 'https://token.botframework.com/signin/test' }] } } });
   });
 
   // I7 — the confused-deputy check.
   it('looks the token up by the authenticated user id, never a fixed one', async () => {
     const lookup = vi.fn(async () => 'tok');
     await handleQueryLink(activity(good, '29:user-b'), {
-      config,
+      ...authDeps, config,
       lookupToken: lookup,
       fetchImpl: okFetch,
     });
-    expect(lookup).toHaveBeenCalledWith('29:user-b');
+    expect(lookup).toHaveBeenCalledWith('29:user-b', undefined, undefined);
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
@@ -74,7 +76,7 @@ describe('handleQueryLink', () => {
     }) as unknown as typeof fetch;
 
     await handleQueryLink(activity(good, '29:a'), {
-      config,
+      ...authDeps, config,
       lookupToken: async (id) => tokens[id] ?? null,
       fetchImpl: spyFetch,
     });
@@ -84,7 +86,7 @@ describe('handleQueryLink', () => {
   it('never calls GitLab when the URL fails validation (I2)', async () => {
     const spy = vi.fn(okFetch);
     const res = await handleQueryLink(activity('https://evil.example/g/p/-/issues/1'), {
-      config,
+      ...authDeps, config,
       lookupToken: async () => 'tok',
       fetchImpl: spy as unknown as typeof fetch,
     });
@@ -96,7 +98,7 @@ describe('handleQueryLink', () => {
     const spy = vi.fn(okFetch);
     const res = await handleQueryLink(
       { type: 'message' },
-      { config, lookupToken: async () => 'tok', fetchImpl: spy as unknown as typeof fetch },
+      { ...authDeps, config, lookupToken: async () => 'tok', fetchImpl: spy as unknown as typeof fetch },
     );
     expect(spy).not.toHaveBeenCalled();
     expect(res).toEqual(EMPTY_RESPONSE);
@@ -105,7 +107,7 @@ describe('handleQueryLink', () => {
   it('does not look up a token before the URL is validated', async () => {
     const lookup = vi.fn(async () => 'tok');
     await handleQueryLink(activity('https://evil.example/g/p/-/issues/1'), {
-      config,
+      ...authDeps, config,
       lookupToken: lookup,
       fetchImpl: okFetch,
     });
@@ -116,7 +118,7 @@ describe('handleQueryLink', () => {
   it('returns byte-identical responses for 403 and 404', async () => {
     const make = (status: number) =>
       handleQueryLink(activity(good), {
-        config,
+        ...authDeps, config,
         lookupToken: async () => 'tok',
         fetchImpl: (async () => new Response('{}', { status })) as unknown as typeof fetch,
       });
@@ -135,7 +137,7 @@ describe('handleQueryLink', () => {
 
     expect(
       await handleQueryLink(activity(good), {
-        config,
+        ...authDeps, config,
         lookupToken: async () => 'tok',
         fetchImpl: aborting,
       }),
@@ -148,7 +150,7 @@ describe('handleQueryLink', () => {
     await handleQueryLink(
       activity('https://gitlab.example.com/acquisition/project-x/-/issues/1'),
       {
-        config,
+        ...authDeps, config,
         lookupToken: async () => 'super-secret-token',
         fetchImpl: okFetch,
         log: (fields) => lines.push(fields),
@@ -166,7 +168,7 @@ describe('handleQueryLink', () => {
     const lines: Record<string, string | number>[] = [];
     await handleQueryLink(
       { type: 'message' },
-      { config, lookupToken: async () => null, log: (fields) => lines.push(fields) },
+      { ...authDeps, config, lookupToken: async () => null, log: (fields) => lines.push(fields) },
     );
     expect(lines[0]!.outcome).toContain('rejected-activity');
   });
@@ -177,7 +179,7 @@ describe('metadata disclosure policy', () => {
     const lookupToken = vi.fn(async () => 'secret');
     const fetchImpl = vi.fn(okFetch);
     const result = await handleQueryLink(activity(`${good}/notes?secret=value#fragment`), {
-      config: loadCoreConfig({ GITLAB_ORIGIN: config.origin }), lookupToken, fetchImpl,
+      ...authDeps, config: loadCoreConfig({ GITLAB_ORIGIN: config.origin }), lookupToken, fetchImpl,
     });
     const json = JSON.stringify(result);
     expect(lookupToken).not.toHaveBeenCalled();
@@ -192,15 +194,71 @@ describe('metadata disclosure policy', () => {
   it('does not fetch from an unapproved namespace in metadata mode', async () => {
     const lookupToken = vi.fn(async () => 'secret');
     expect(await handleQueryLink(activity('https://gitlab.example.com/other/project/-/issues/1'), {
-      config, lookupToken,
+      ...authDeps, config, lookupToken,
     })).toEqual(EMPTY_RESPONSE);
     expect(lookupToken).not.toHaveBeenCalled();
   });
   it('withholds a confidential issue even from an approved project', async () => {
     const result = await handleQueryLink(activity(good), {
-      config, lookupToken: async () => 'secret',
+      ...authDeps, config, lookupToken: async () => 'secret',
       fetchImpl: async () => new Response(JSON.stringify({ ...payload, confidential: true })),
     });
     expect(result).toEqual(EMPTY_RESPONSE);
+  });
+});
+
+describe('account lifecycle', () => {
+  it('returns a new sign-in action when GitLab rejects a stored token', async () => {
+    const signOut = vi.fn(async () => {});
+    const result = await handleQueryLink(activity(good, '29:a'), {
+      ...authDeps, config, signOut, lookupToken: async () => 'expired',
+      fetchImpl: async () => new Response('{}', { status: 401 }),
+    });
+    expect(signOut).toHaveBeenCalledWith('29:a', undefined);
+    expect(result).toMatchObject({ composeExtension: { type: 'auth' } });
+  });
+  it('passes the resumed query code to the token service for validation', async () => {
+    const lookupToken = vi.fn(async () => 'tok');
+    const request = activity(good);
+    await handleQueryLink({ ...request, value: { ...request.value, state: '123456' } }, { ...authDeps, config, lookupToken, fetchImpl: okFetch });
+    expect(lookupToken).toHaveBeenCalledWith('29:user-a', '123456', undefined);
+  });
+  it('still offers caller-bound reconnect when stale-token cleanup fails, without logging the error', async () => {
+    const request = activity(good, '29:a');
+    const signal = new AbortController().signal;
+    const signOut = vi.fn(async () => { throw new Error('secret-token-in-upstream-URL'); });
+    const getSignInUrl = vi.fn(authDeps.getSignInUrl);
+    const log = vi.fn();
+    const result = await handleQueryLink(request, {
+      config, signal, signOut, getSignInUrl, log, lookupToken: async () => 'expired',
+      fetchImpl: async () => new Response('{}', { status: 401 }),
+    });
+    expect(signOut).toHaveBeenCalledExactlyOnceWith('29:a', signal);
+    expect(getSignInUrl).toHaveBeenCalledExactlyOnceWith(request, signal);
+    expect(result).toMatchObject({ composeExtension: { type: 'auth', suggestedActions: { actions: [
+      { type: 'openUrl', value: 'https://token.botframework.com/signin/test' },
+    ] } } });
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'reconnect-cleanup-failed' }));
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret-token');
+  });
+  it('only disconnects the caller, ignoring a forged target in the command data', async () => {
+    const signOut = vi.fn(async () => {});
+    await handleActivity({ ...activity(good, '29:a'), name: 'composeExtension/submitAction', value: { commandId: 'disconnect', data: { confirm: true, userId: '29:victim' } } }, {
+      ...authDeps, config, signOut, lookupToken: async () => null,
+    });
+    expect(signOut).toHaveBeenCalledWith('29:a', undefined);
+  });
+  it('does not disconnect on opening or cancelling the dialog', async () => {
+    const signOut = vi.fn(async () => {});
+    for (const name of ['composeExtension/fetchTask', 'composeExtension/submitAction']) {
+      await handleActivity({ ...activity(good), name, value: { commandId: 'disconnect', data: { confirm: false } } }, { ...authDeps, config, signOut, lookupToken: async () => null });
+    }
+    expect(signOut).not.toHaveBeenCalled();
+  });
+  it('does not accept an unverified sign-in completion', async () => {
+    const lookupToken = vi.fn(async () => null);
+    const response = await handleActivity({ ...activity(good), name: 'signin/verifyState', value: { state: 'wrong-code' } }, { ...authDeps, config, lookupToken });
+    expect(response).toEqual({ status: 401 });
+    expect(lookupToken).toHaveBeenCalledWith('29:user-a', 'wrong-code', undefined);
   });
 });

@@ -4,7 +4,7 @@ const EXPECTED_NAME = 'composeExtension/queryLink';
 const EXPECTED_CHANNEL = 'msteams';
 
 export type ActivityCheck =
-  | { readonly ok: true; readonly url: string; readonly userId: string }
+  | { readonly ok: true; readonly url: string; readonly userId: string; readonly code?: string }
   | { readonly ok: false; readonly reason: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,5 +42,9 @@ export function checkActivity(activity: unknown): ActivityCheck {
     return { ok: false, reason: 'url' };
   }
 
-  return { ok: true, url, userId: from.id };
+  const code = value.state;
+  if (code !== undefined && (typeof code !== 'string' || code.length === 0 || code.length > 512)) {
+    return { ok: false, reason: 'state' };
+  }
+  return { ok: true, url, userId: from.id, ...(code === undefined ? {} : { code }) };
 }
