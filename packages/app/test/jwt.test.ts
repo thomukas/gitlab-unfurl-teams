@@ -69,4 +69,24 @@ describe('Connector JWT and activity boundary', () => {
     expect(await verify.verify(`Bearer ${await signed()}`)).toBeNull();
     await expect(verify.ready()).rejects.toThrow();
   });
+  it('loads and verifies against a large signing-key set with certificate chains', async () => {
+    // Microsoft publishes hundreds of keys, including certificate-chain metadata.
+    const body = JSON.stringify({ keys: Array.from({ length: 228 }, (_, index) => ({
+      ...publicJwk, kid: index === 0 ? 'test-key' : `rotated-${index}`, endorsements: ['msteams'],
+      x5c: ['A'.repeat(3000)],
+    })) });
+    expect(Buffer.byteLength(body)).toBeGreaterThan(256 * 1024);
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(body));
+    const verify = createJwtVerifier(config, fetcher);
+    await expect(verify.ready()).resolves.toBeUndefined();
+    expect((await verify.verify(`Bearer ${await signed()}`))?.(activity)).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('still bounds streamed signing-key responses without trusting content-length', async () => {
+    const verify = createJwtVerifier(config, async () => new Response(' '.repeat(2 * 1024 * 1024 + 1), {
+      headers: { 'content-length': '2' },
+    }));
+    await expect(verify.ready()).rejects.toThrow('too-large');
+    expect(await verify.verify(`Bearer ${await signed()}`)).toBeNull();
+  });
 });
