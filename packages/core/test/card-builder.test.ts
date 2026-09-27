@@ -4,6 +4,7 @@ import type { CoreConfig } from '../src/config.js';
 import type { Entity } from '../src/types.js';
 
 const cfg: CoreConfig = {
+  previewMode: 'link',
   origin: 'https://gitlab.example.com',
   projectAllowlist: [],
   timeoutMs: 3000,

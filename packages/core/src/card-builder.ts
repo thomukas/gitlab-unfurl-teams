@@ -1,5 +1,5 @@
 import type { CoreConfig } from './config.js';
-import type { Entity } from './types.js';
+import type { Entity, GitLabRef } from './types.js';
 
 const MAX_TITLE = 200;
 const MAX_NAME = 60;
@@ -153,6 +153,32 @@ export function buildUnfurlResponse(entity: Entity, config: CoreConfig): object 
       suggestedActions: {
         actions: [{ type: 'setCachePolicy', value: '{"type":"no-cache"}' }],
       },
+    },
+  };
+}
+
+/** No lookup, existence disclosure or GitLab metadata. The pasted link is already shared. */
+export function buildLinkResponse(ref: GitLabRef, config: CoreConfig): object {
+  const segments = { merge_request: 'merge_requests', issue: 'issues', epic: 'epics' };
+  const prefix = ref.kind === 'epic' ? '/groups/' : '/';
+  const url = `${config.origin}${prefix}${ref.namespacePath}/-/${segments[ref.kind]}/${ref.iid}`;
+  return {
+    composeExtension: {
+      type: 'result',
+      attachmentLayout: 'list',
+      attachments: [{
+        contentType: 'application/vnd.microsoft.card.adaptive',
+        content: {
+          type: 'AdaptiveCard', version: '1.3',
+          body: [{ type: 'TextBlock', text: 'GitLab link', weight: 'Bolder' }],
+          actions: [{ type: 'Action.OpenUrl', title: 'Open in GitLab', url }],
+        },
+        preview: {
+          contentType: 'application/vnd.microsoft.card.thumbnail',
+          content: { title: 'GitLab link', text: 'Open in GitLab to view details.' },
+        },
+      }],
+      suggestedActions: { actions: [{ type: 'setCachePolicy', value: '{"type":"no-cache"}' }] },
     },
   };
 }

@@ -2,7 +2,7 @@ import type { CoreConfig } from './config.js';
 import { SCOPE_OF } from './types.js';
 import type { Entity, GitLabRef } from './types.js';
 
-export type FetchFailure = 'not-found' | 'timeout' | 'too-large' | 'network' | 'bad-response';
+export type FetchFailure = 'not-found' | 'timeout' | 'too-large' | 'network' | 'bad-response' | 'restricted';
 
 export type FetchResult =
   | { readonly ok: true; readonly entity: Entity }
@@ -149,6 +149,12 @@ export async function fetchEntity(
       parsed = JSON.parse(text);
     } catch {
       return { ok: false, reason: 'bad-response' };
+    }
+
+    // Even approved projects can contain confidential issues or epics.
+    // Never turn those into shared Teams metadata, including on malformed flags.
+    if (isRecord(parsed) && parsed.confidential !== undefined && parsed.confidential !== false) {
+      return { ok: false, reason: 'restricted' };
     }
 
     const entity = toEntity(ref, parsed);

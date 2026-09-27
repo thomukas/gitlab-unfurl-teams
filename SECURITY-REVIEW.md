@@ -1,134 +1,86 @@
-# Security Review Pack
+# Security review pack
 
-For the reviewer who must approve running this in your tenant. Every claim
-here is checkable against the source. Run `pnpm test` to see the controls
-pass: 146 tests, no network access required.
+## Release status
 
----
+This checkout is not approved for production. The host JWT and OAuth adapters
+are deny-only stubs. Local tests cover the implemented boundaries; they do not
+prove live Teams authentication or deployment controls.
 
-## The short version
+## Sharing boundary
 
-The application holds **no shared GitLab credential** and **never chooses an
-authenticated request destination from untrusted input**. Each GitLab request
-is made as the authenticated Teams user, to one administrator-configured
-GitLab origin, using a read-only OAuth scope. GitLab remains the
-authorization authority for every project.
+`PREVIEW_MODE=link` is the default. It returns a generic card and a canonical
+GitLab link, without looking up a token or fetching an entity. It does not reveal
+whether an item exists. The destination contains the reference the user pasted;
+query strings, fragments and trailing subpaths are removed.
 
----
+`PREVIEW_MODE=metadata` is an explicit disclosure setting. It requires a
+nonempty `PROJECT_ALLOWLIST` of approved namespace/project prefixes. The sender's
+OAuth grant authorizes the API read. Every reader of the posted Teams message
+can see the card's title, project, author, assignees, labels, state and pipeline.
+Readers do not need GitLab permissions. Confidential issues/epics are withheld;
+non-confidential items in private projects can still be sensitive.
 
-## The questions you are going to ask
+Approve prefixes only when this disclosure is acceptable, including the audiences
+in chats/channels and any guests. No-cache controls preview reuse, not the access
+or retention of a posted message. Revoking GitLab access does not retract cards.
+If GitLab must authorize each reader, keep link mode and view details in GitLab.
 
-| Question | Answer |
+## Credentials and data flows
+
+- No Microsoft Graph or resource-specific consent permissions are requested;
+  the manifest requests identity only.
+- Metadata mode uses `read_api`, which grants broad read access to resources
+  accessible to the GitLab user, not just the allowlisted projects. The allowlist
+  constrains this application's normal behavior, not a stolen token's scope.
+- The configured Microsoft token service stores user OAuth grants. The Azure Bot
+  OAuth connection holds the GitLab OAuth client secret. The backend processes
+  returned GitLab access tokens in memory and holds a bot credential.
+- A compromised backend can steal tokens it processes and abuse its bot identity.
+  Read-only scopes, egress restrictions and a secret store reduce risk; they do
+  not make backend compromise harmless or restrict it to the currently open chat.
+- In metadata mode, GitLab API results pass through the backend to Microsoft
+  Teams. Posted cards become message content subject to tenant retention and
+  discovery controls. There is no application database or entity cache.
+- Infrastructure logs and telemetry have separate access and retention controls.
+  Do not enable body/header capture or token-bearing URL capture at proxies.
+- Choose token-service region, hosting region and network routes with the data
+  owner. Using your own Azure subscription alone is not a data residency guarantee.
+
+GitLab documents the grant at <https://docs.gitlab.com/integration/oauth_provider/>.
+Microsoft documents token storage at
+<https://learn.microsoft.com/en-us/azure/bot-service/bot-builder-concept-authentication>.
+
+## Implemented controls and evidence
+
+| Control | Evidence |
 |---|---|
-| What Microsoft Graph permissions does it request? | **None.** It is a bot endpoint. It reads no mailbox, no calendar, no directory. The manifest requests only `identity`. |
-| What data leaves the tenant? | One HTTPS request per pasted link, to the configured GitLab origin only. It carries the project path and the entity number. |
-| What does it store? | No application datastore. No database, no disk write, no cache. See "What is and is not stored" below. |
-| What credentials does it hold? | The bot secret only. It holds **no** GitLab credential: the GitLab OAuth client secret lives in the Azure Bot Service connection, and user tokens live in the Microsoft-operated Bot Framework token service. |
-| Whose GitLab data can a user see? | Their own, and only their own. The application acts as the signed-in user. |
-| How broad is the GitLab scope? | `read_api`. Stated honestly, this grants read access to the GitLab API for **every resource accessible to that user**, not merely the pasted project. It is read-only: it cannot write, merge, approve or delete. It is the narrowest scope GitLab offers for reading issues and merge requests. |
-| Can a pasted link redirect the credential elsewhere? | No. The destination comes from configuration only, and the validated reference deliberately carries no host. Redirects are refused outright. |
-| What can a compromised instance do? | Read what a currently signed-in user can already read. Egress policy limits reach further. |
-| How do we revoke one user? | The user revokes the authorization in GitLab, or an administrator deletes the Bot Service OAuth connection. No code change, no redeploy. |
-| Does it let someone enumerate private projects? | No. `403` and `404` produce a byte-identical response. |
-| What runs where? | A Node HTTP server in the deployer's own subscription. Deployable as a zip to a managed Node runtime or as a container — no registry required either way. |
-| Does it work without installing the app? | No, deliberately. `supportsAnonymizedPayloads` is absent. |
+| Generic cards by default; metadata requires approved prefixes | `config.test.ts`, `handler.test.ts` |
+| Confidential entity metadata withheld | `gitlab-client.test.ts`, `handler.test.ts` |
+| HTTPS, exact configured origin, no userinfo or encoded separators | `config.test.ts`, `url-validator.test.ts` |
+| API destination constructed from trusted configuration; redirects refused | `gitlab-client.test.ts` |
+| Only expected authenticated activity shape processed | `activity.test.ts`, `server.test.ts` |
+| Sender identity selects token | `handler.test.ts`; real token adapter still pending |
+| No preview cache reuse | `card-builder.test.ts` |
+| 403/404 have identical response bodies | `handler.test.ts`; not a guarantee of identical timing |
+| Sanitized and bounded card text and action URLs | `card-builder.test.ts` |
+| One GitLab request with deadline and response-size cap | `gitlab-client.test.ts` |
+| Allowlisted log fields omit tokens, raw URLs and bodies | `redact.test.ts`, `handler.test.ts` |
+| Dependency audit and CodeQL workflows, SHA-pinned actions | `.github/workflows/` |
 
----
+Namespace hashes in logs are pseudonymous correlation identifiers. Unsalted
+hashes of guessable project paths are not anonymization. Restrict log access.
 
-## Security invariants and the tests that prove them
+## Revocation and operations
 
-| # | Invariant | Proven by |
-|---|---|---|
-| I1 | A GitLab token is never shared between Teams users | `packages/app/test/handler.test.ts` — "sends user A the token belonging to A, never to B" |
-| I2 | A token is sent only to the configured origin | `packages/core/test/gitlab-client.test.ts` — "calls the configured origin, never a host from the ref"; `url-validator.test.ts` — "the returned ref carries no host"; `handler.test.ts` — "never calls GitLab when the URL fails validation" |
-| I3 | Authenticated requests never follow redirects | `packages/core/test/gitlab-client.test.ts` — "sets redirect:error so a redirect cannot move the token", "fails rather than following a refused redirect" |
-| I4 | GitLab communication requires HTTPS | `packages/core/test/config.test.ts` — rejects `http://`, `ftp://`, no-scheme; `url-validator.test.ts` — scheme rejections |
-| I5 | Every request passes JWT validation | `packages/app/test/server.test.ts` — 401 without a header, 401 on a bad token, 401 when the verifier throws; `hosts/aws/test/deps.test.ts` — the unwired stub denies. **Partial: see "Not yet implemented" below.** |
-| I6 | Only the expected invoke is processed | `packages/app/test/activity.test.ts` — 14 rejection cases; `handler.test.ts` — "never calls GitLab when the activity is rejected" |
-| I7 | Token lookup is bound to the authenticated user | `packages/app/test/handler.test.ts` — "looks the token up by the authenticated user id, never a fixed one" |
-| I8 | GitLab remains the authorization authority | By construction: the request carries the user's own token, so GitLab decides. The allowlist is a blast-radius control only. |
-| I9 | No cross-user card reuse | `packages/core/test/card-builder.test.ts` — "always sets no-cache" |
-| I10 | 403 and 404 are indistinguishable | `packages/core/test/gitlab-client.test.ts` — both map to `not-found`; `handler.test.ts` — "returns byte-identical responses for 403 and 404" |
-| I11 | Tokens, JWTs, URLs and bodies are never logged | `packages/core/test/redact.test.ts`; `handler.test.ts` — "never logs the token, the full URL or the raw project path" |
-| I12 | GitLab strings and URLs are bounded and validated | `packages/core/test/card-builder.test.ts` — 13 tests covering markdown links, bare URLs, hostile schemes, length and collection caps |
-| I13 | Request, response and fan-out limits are enforced | `packages/core/test/gitlab-client.test.ts` — size cap, declared-length short circuit, timeout, "makes exactly one request per call"; `url-validator.test.ts` — URL length cap |
-| I14 | Production egress is restricted | **Infrastructure. Not yet implemented.** |
-| I15 | Bot credentials come from a managed secret store | **Infrastructure. Not yet implemented.** |
+A user can revoke the grant under GitLab **Edit profile → Access → Applications**.
+Removing a Teams app does not establish that its GitLab authorization was revoked.
+Deleting the shared Azure Bot OAuth connection affects the entire integration;
+it is not a per-user revocation procedure. Per-user token-service disconnect and
+credential rotation require a tested operational procedure before rollout.
 
----
-
-## Two design decisions worth your attention
-
-**The validated reference carries no host.** `GitLabRef` is `{ kind, namespacePath, iid }`.
-The validator proves the pasted origin equals the configured origin, then
-discards it. The client cannot be pointed anywhere by pasted input, because it
-never receives a destination.
-
-**The URL shape and the entity kind must agree.** Epics use a second shape —
-`/groups/{namespace}/-/epics/17` — so the validator cannot simply treat
-everything before `/-/` as a project path. A merge request inside `/groups/`, an
-epic outside it, or a project whose namespace merely *starts* with those letters
-(`/groupsX/proj/-/epics/1`) are all rejected. The `/groups/` prefix is matched
-exactly rather than by string prefix, for that last reason.
-
-**Two checks exist because of verified parser behaviour, not caution.**
-
-- `https://evil.com@gitlab.example.com/…` parses with an origin **equal to**
-  the configured one and a username of `evil.com`. Origin equality alone does
-  not catch it, so userinfo is checked explicitly.
-- `https://gitlab.example.com/g%2Fp/-/issues/1` keeps `%2F` encoded in
-  `pathname`. Decoding before splitting would turn `g%2Fp` into the different
-  project `g/p`, so encoded separators are rejected before any decoding.
-
-Both are in the rejection corpus in `packages/core/test/url-validator.test.ts`.
-
----
-
-## What is and is not stored
-
-The application has no intentional persistent datastore. Operational
-infrastructure — application logs, load balancer logs, platform telemetry, error
-tracing — may transiently process request metadata under your hosting
-provider's retention policy.
-
-The application MUST NOT log OAuth tokens, `Authorization` headers, full GitLab
-URLs, request bodies or GitLab response bodies. `namespacePath` is hashed, because
-a path such as `/acquisition/project-x/` is itself confidential business
-information. The entity number is dropped entirely, since it would narrow the
-hash to a single item.
-
-A log line looks like this:
-
-```
-{"host":"gitlab.example.com","outcome":"ok","latency_ms":182,"entity":"merge_request","namespace":"a3f9c1e40b27"}
-```
-
----
-
-## Not yet implemented
-
-Stated plainly, because a review of a partly-built system is worthless without
-it. These need live Azure resources and cannot be built or verified locally.
-
-| Gap | Consequence today |
-|---|---|
-| `lookupToken` is not wired to the Bot Framework token service | Returns `null`. Every request gets the sign-in card. |
-| `verifyJwt` is not wired to real JWKS validation | Returns `false`. Every request is refused with 401. |
-| Egress policy (I14) | Not enforced. |
-| Managed secret injection (I15) | Not enforced. |
-| CI: audit, SAST, secret scanning, SBOM, image scanning | Not present. |
-
-**Both credential stubs deny.** A deployment shipped in this state refuses every
-request rather than serving one unauthenticated. `hosts/aws/test/deps.test.ts`
-asserts this, so a future change that flips a stub to allow will fail the suite.
-
-This is deliberate sequencing, not an oversight. `verifyJwt` and `lookupToken`
-are the two security-critical seams in the application, and writing them as part
-of an infrastructure task is how a JWT check ends up cursory. If you provision
-the hosting and get a 401, that is the design working — not a misconfiguration
-to route around.
-
-On secrets (I15): the bot password should reach the process as a managed-secret
-reference resolved by the platform, never as a literal in app settings, a
-deployment manifest, an image or CI output. On Azure that is a Key Vault
-reference; the equivalent exists on the other two clouds.
+Egress policy, managed secret injection, inbound request limits, production
+monitoring and release/deployment automation are not provided yet. CI includes
+an audit and SAST workflow; secret-scanning configuration, SBOMs and any image
+scanning must be verified separately. Test live sign-in, refresh, revocation,
+restricted projects, cross-audience sharing and failure recovery in a dedicated
+tenant before deployment approval.

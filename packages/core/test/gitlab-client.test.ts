@@ -4,6 +4,7 @@ import type { CoreConfig } from '../src/config.js';
 import type { GitLabRef } from '../src/types.js';
 
 const cfg: CoreConfig = {
+  previewMode: 'link',
   origin: 'https://gitlab.example.com',
   projectAllowlist: [],
   timeoutMs: 3000,
@@ -151,5 +152,15 @@ describe('fetchEntity', () => {
     const result = await fetchEntity(ref, 'tok', cfg, f);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.entity.pipeline).toBeUndefined();
+  });
+});
+
+describe('confidential entities', () => {
+  it.each([true, 'true', 1, null])('withholds confidential or malformed flag %s', async (confidential) => {
+    expect(await fetchEntity(ref, 'tok', cfg, async () => jsonResponse({ ...payload, confidential })))
+      .toEqual({ ok: false, reason: 'restricted' });
+  });
+  it('allows an explicitly non-confidential item', async () => {
+    expect((await fetchEntity(ref, 'tok', cfg, async () => jsonResponse({ ...payload, confidential: false }))).ok).toBe(true);
   });
 });

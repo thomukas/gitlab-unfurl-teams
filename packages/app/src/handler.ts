@@ -1,4 +1,5 @@
 import {
+  buildLinkResponse,
   buildUnfurlResponse,
   fetchEntity,
   safeLogFields,
@@ -82,6 +83,11 @@ export async function handleQueryLink(activity: unknown, deps: HandlerDeps): Pro
   if (!validated.ok) {
     emit(`rejected-url:${validated.reason}`);
     return EMPTY_RESPONSE;
+  }
+
+  if (deps.config.previewMode === 'link') {
+    emit('link-only');
+    return buildLinkResponse(validated.ref, deps.config);
   }
 
   const token = await deps.lookupToken(checked.userId);
