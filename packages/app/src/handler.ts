@@ -120,6 +120,12 @@ export async function handleActivity(activity: unknown, deps: HandlerDeps): Prom
     || !isRecord(activity.from) || typeof activity.from.id !== 'string' || !activity.from.id
     || !isRecord(activity.value)) return EMPTY_RESPONSE;
   const value = activity.value;
+  if (deps.config.previewMode === 'link') {
+    if (activity.name === 'signin/verifyState') return { status: 401 };
+    if (value.commandId === 'disconnect' && (activity.name === 'composeExtension/fetchTask' || activity.name === 'composeExtension/submitAction')) {
+      return { task: { type: 'message', value: 'Link mode does not use a GitLab account. Revoke any earlier grant in GitLab Authorized applications.' } };
+    }
+  }
   if (activity.name === 'signin/verifyState') {
     if (typeof value.state !== 'string' || !value.state || value.state.length > 512) return EMPTY_RESPONSE;
     const token = await deps.lookupToken(activity.from.id, value.state, deps.signal);
