@@ -223,6 +223,24 @@ describe('account lifecycle', () => {
     await handleQueryLink({ ...request, value: { ...request.value, state: '123456' } }, { ...authDeps, config, lookupToken, fetchImpl: okFetch });
     expect(lookupToken).toHaveBeenCalledWith('29:user-a', '123456', undefined);
   });
+  it('still offers caller-bound reconnect when stale-token cleanup fails, without logging the error', async () => {
+    const request = activity(good, '29:a');
+    const signal = new AbortController().signal;
+    const signOut = vi.fn(async () => { throw new Error('secret-token-in-upstream-URL'); });
+    const getSignInUrl = vi.fn(authDeps.getSignInUrl);
+    const log = vi.fn();
+    const result = await handleQueryLink(request, {
+      config, signal, signOut, getSignInUrl, log, lookupToken: async () => 'expired',
+      fetchImpl: async () => new Response('{}', { status: 401 }),
+    });
+    expect(signOut).toHaveBeenCalledExactlyOnceWith('29:a', signal);
+    expect(getSignInUrl).toHaveBeenCalledExactlyOnceWith(request, signal);
+    expect(result).toMatchObject({ composeExtension: { type: 'auth', suggestedActions: { actions: [
+      { type: 'openUrl', value: 'https://token.botframework.com/signin/test' },
+    ] } } });
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'reconnect-cleanup-failed' }));
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret-token');
+  });
   it('only disconnects the caller, ignoring a forged target in the command data', async () => {
     const signOut = vi.fn(async () => {});
     await handleActivity({ ...activity(good, '29:a'), name: 'composeExtension/submitAction', value: { commandId: 'disconnect', data: { confirm: true, userId: '29:victim' } } }, {

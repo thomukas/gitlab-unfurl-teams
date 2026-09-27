@@ -24,16 +24,16 @@ export function createTokenService(config: BotConfig, fetchImpl: typeof fetch = 
     signal?.throwIfAborted();
     return token;
   };
-  const call = async (path: string, params: Record<string, string>, signal?: AbortSignal) => {
+  const call = async (method: 'GET' | 'DELETE', path: string, params: Record<string, string>, signal?: AbortSignal) => {
     const token = await accessToken(signal);
     const url = new URL(path, config.oauthOrigin);
     url.search = new URLSearchParams(params).toString();
-    return requestJson(url, { headers: { authorization: `Bearer ${token}`, accept: 'application/json' } }, fetchImpl, signal);
+    return requestJson(url, { method, headers: { authorization: `Bearer ${token}`, accept: 'application/json' } }, fetchImpl, signal);
   };
   return {
     ready: async () => { await accessToken(); },
     lookup: async (userId: string, code?: string, signal?: AbortSignal): Promise<string | null> => {
-      const { status, value } = await call('/api/usertoken/GetToken', {
+      const { status, value } = await call('GET', '/api/usertoken/GetToken', {
         userId, connectionName: config.connectionName, channelId: 'msteams', ...(code ? { code } : {}),
       }, signal);
       if (status === 404 || value === null) return null;
@@ -50,14 +50,14 @@ export function createTokenService(config: BotConfig, fetchImpl: typeof fetch = 
           conversation: activity.conversation, channelId: 'msteams', serviceUrl: activity.serviceUrl,
           locale: activity.locale },
       })).toString('base64');
-      const { value } = await call('/api/botsignin/GetSignInResource', { state }, signal);
+      const { value } = await call('GET', '/api/botsignin/GetSignInResource', { state }, signal);
       if (!isRecord(value) || typeof value.signInLink !== 'string') throw new BoundaryError('upstream');
       const url = new URL(value.signInLink);
       if (url.origin !== config.oauthOrigin || url.username || url.password) throw new BoundaryError('upstream');
       return url.href;
     },
     signOut: async (userId: string, signal?: AbortSignal): Promise<void> => {
-      await call('/api/usertoken/SignOut', { userId, connectionName: config.connectionName, channelId: 'msteams' }, signal);
+      await call('DELETE', '/api/usertoken/SignOut', { userId, connectionName: config.connectionName, channelId: 'msteams' }, signal);
     },
   };
 }

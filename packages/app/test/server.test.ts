@@ -115,4 +115,18 @@ describe('operational boundaries', () => {
     expect(response.headers.get('x-request-id')).toBeTruthy();
     expect(await response.text()).not.toContain('secret-token');
   });
+  it('reports an explicit disconnect failure instead of claiming the grant was removed', async () => {
+    const signOut = vi.fn(async () => { throw new Error('secret-token-in-upstream-URL'); });
+    const app = createServer({ ...deps, signOut,
+      config: loadCoreConfig({ GITLAB_ORIGIN: 'https://gitlab.example.com', PREVIEW_MODE: 'metadata', PROJECT_ALLOWLIST: 'g' }),
+    });
+    const response = await app.request('/api/messages', {
+      method: 'POST', headers: { authorization: 'Bearer good' },
+      body: JSON.stringify({ type: 'invoke', name: 'composeExtension/submitAction', channelId: 'msteams',
+        from: { id: '29:a' }, value: { commandId: 'disconnect', data: { confirm: true } } }),
+    });
+    expect(signOut).toHaveBeenCalledExactlyOnceWith('29:a', expect.any(AbortSignal));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'service unavailable', requestId: expect.any(String) });
+  });
 });

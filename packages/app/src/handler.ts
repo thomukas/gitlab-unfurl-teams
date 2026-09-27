@@ -102,7 +102,9 @@ export async function handleQueryLink(activity: unknown, deps: HandlerDeps): Pro
   if (!result.ok) {
     emit(`gitlab:${result.reason}`, validated.ref);
     if (result.reason === 'unauthorized') {
-      await deps.signOut(checked.userId, deps.signal);
+      // Cleanup is best-effort: a rejected GitLab grant still needs a sign-in action.
+      try { await deps.signOut(checked.userId, deps.signal); }
+      catch { emit('reconnect-cleanup-failed', validated.ref); }
       return authResponse(await deps.getSignInUrl(activity, deps.signal));
     }
     return EMPTY_RESPONSE;
