@@ -29,7 +29,7 @@ for (const input of Object.keys(result.metafile.inputs)) {
     if (existsSync(file)) {
       const pkg = JSON.parse(readFileSync(file, 'utf8'));
       if (pkg.name && pkg.version) {
-        const purl = `pkg:npm/${pkg.name.replace('@', '%40')}@${pkg.version}`;
+        const purl = `pkg:npm/${pkg.name.split('/').map(encodeURIComponent).join('/')}@${encodeURIComponent(pkg.version)}`;
         components.set(purl, { type: 'library', name: pkg.name, version: pkg.version, purl, 'bom-ref': purl });
         break;
       }
