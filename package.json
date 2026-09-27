@@ -11,13 +11,20 @@
     "typecheck": "tsc -b && tsc -p tsconfig.check.json",
     "build": "tsc -b",
     "preview": "tsx tools/preview.ts",
-    "dev": "tsx tools/dev-server.ts"
+    "dev": "tsx tools/dev-server.ts",
+    "package:backend": "pnpm build && node tools/package-backend.mjs",
+    "package:verify": "node tools/verify-package.mjs",
+    "package:teams": "node manifest/build-manifest.mjs"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
-    "vitest": "4.1.11",
+    "@hono/node-server": "2.1.1",
     "@types/node": "24.10.1",
-    "tsx": "4.21.1",
-    "@hono/node-server": "2.1.1"
+    "ajv": "8.20.0",
+    "ajv-draft-04": "1.0.0",
+    "ajv-formats": "3.0.1",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
   }
 }

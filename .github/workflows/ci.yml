@@ -47,7 +47,38 @@ jobs:
       # the icons are the right size. Cheap, and it fails loudly if someone
       # edits the manifest template into invalid JSON.
       - name: Build the Teams app package
-        run: BOT_ID=ci-placeholder GITLAB_ORIGIN=https://gitlab.com node manifest/build-manifest.mjs
+        env:
+          BOT_ID: 11111111-1111-4111-8111-111111111111
+          GITLAB_ORIGIN: https://gitlab.com
+          DEVELOPER_NAME: CI validation only
+          WEBSITE_URL: https://company.internal/support
+          PRIVACY_URL: https://company.internal/privacy
+          TERMS_URL: https://company.internal/terms
+        run: pnpm package:teams
+
+      - name: Build standalone backend and dependency inventory
+        run: pnpm package:backend
+
+      - name: Verify isolated backend ZIP
+        run: pnpm package:verify
+
+      - name: Compile Azure infrastructure
+        if: matrix.node == 22
+        run: |
+          az bicep install --version v0.47.16
+          az bicep build --file deploy/azure/main.bicep --outfile /tmp/main.json
+
+      - name: Retain reviewed backend artifact
+        if: matrix.node == 22
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-${{ github.sha }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            artifacts/gitlab-unfurl-backend.zip
+            artifacts/backend.cdx.json
+            artifacts/SHA256SUMS
 
   audit:
     runs-on: ubuntu-latest

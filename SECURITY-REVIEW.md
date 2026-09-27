@@ -93,10 +93,17 @@ bot credential acquisition. It does not prove the OAuth connection or GitLab is
 reachable. Correlation IDs and fixed error categories are emitted without raw
 upstream errors. OAuth state/code validation is delegated to Microsoft's token
 service, with caller-bound sign-in links and code forwarding on resumed invokes.
-Egress policy, secret injection, production alerts and release/deployment
-automation still require deployment configuration. CI includes
-an audit and SAST workflow; secret-scanning configuration, SBOMs and any image
-scanning must be verified separately. Test live sign-in, refresh, revocation,
+The Azure reference template supplies a Key Vault reference, a dedicated secret
+reader, restricted ingress/SCM, logs and baseline alerts. It requires an existing
+approved subnet and routes outbound traffic through it; the network owner must
+supply and test the actual egress policy. It is a compiled reference, not evidence
+of a completed deployment. See `docs/ADMIN.md` for roles and live acceptance.
+Backend packaging bundles the runtime, records its source commit and produces a
+CycloneDX inventory and checksums. CI verifies the isolated ZIP. Teams packages
+require real publisher URLs and pass the vendored Microsoft schema validator. CI includes
+an audit and SAST workflow. Secret-scanning configuration still needs to be
+verified for the repository. There is no container image in the reference path;
+an organization choosing containers must add image scanning. Test live sign-in, refresh, revocation,
 restricted projects, cross-audience sharing and failure recovery in a dedicated
 tenant before deployment approval.
 

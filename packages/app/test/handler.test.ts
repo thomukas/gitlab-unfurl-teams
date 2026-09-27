@@ -244,3 +244,14 @@ describe('account lifecycle', () => {
     expect(lookupToken).toHaveBeenCalledWith('29:user-a', 'wrong-code', undefined);
   });
 });
+
+it('keeps account actions credential-free in default link mode', async () => {
+  const lookupToken = vi.fn(async () => null);
+  const signOut = vi.fn(async () => {});
+  const result = await handleActivity({ ...activity(good), name: 'composeExtension/fetchTask', value: { commandId: 'disconnect' } }, {
+    ...authDeps, config: loadCoreConfig({}), lookupToken, signOut,
+  });
+  expect(JSON.stringify(result)).toContain('GitLab Authorized applications');
+  expect(lookupToken).not.toHaveBeenCalled();
+  expect(signOut).not.toHaveBeenCalled();
+});

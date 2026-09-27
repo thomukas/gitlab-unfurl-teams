@@ -8,3 +8,4 @@ manifest/build/
 preview.html
 EXECUTION-LOG
 .DS_Store
+artifacts/

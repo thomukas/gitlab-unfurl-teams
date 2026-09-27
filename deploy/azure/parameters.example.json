@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "name": { "value": "REPLACE-with-unique-app-name" },
+    "location": { "value": "westeurope" },
+    "botLocation": { "value": "global" },
+    "botClientId": { "value": "REPLACE-with-Entra-client-GUID" },
+    "botTenantId": { "value": "REPLACE-with-Entra-tenant-GUID" },
+    "gitlabOrigin": { "value": "https://gitlab.company.com" },
+    "previewMode": { "value": "link" },
+    "projectAllowlist": { "value": "" },
+    "oauthOrigin": { "value": "https://token.botframework.com" },
+    "vaultName": { "value": "REPLACE-with-dedicated-vault" },
+    "integrationSubnetResourceId": { "value": "REPLACE-with-approved-subnet-resource-ID" },
+    "deploymentSourceCidr": { "value": "REPLACE-with-corporate-IPv4-CIDR" },
+    "operationsActionGroupId": { "value": "REPLACE-with-operations-action-group-resource-ID" }
+  }
+}
