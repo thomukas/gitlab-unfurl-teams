@@ -1,10 +1,22 @@
 # gitlab-unfurl-teams
 
-Paste a GitLab merge request, issue or epic link into Microsoft Teams and get a
-card instead of a sign-in page.
+Paste a GitLab merge request, issue or epic link into Teams and get a card.
+The default `PREVIEW_MODE=link` produces a generic link card without calling
+GitLab or exposing titles, names, labels, status, or even whether the item exists.
 
-Each person sees exactly what they can already see in GitLab, because the card
-is built with their own OAuth token. There is no shared service token.
+**Rich cards are shared content, not a per-reader GitLab view.** In opt-in
+`PREVIEW_MODE=metadata`, the sender authorizes the fetch with their own GitLab
+account. Everyone who can read the posted Teams message can read the resulting
+metadata, even without GitLab access. Later GitLab access revocation does not
+remove existing cards. Teams retention applies to posted messages.
+
+Metadata mode requires a nonempty `PROJECT_ALLOWLIST` of approved namespace or
+project prefixes. Confidential issues and epics are withheld. Approval of a
+prefix is approval to share its non-confidential metadata in Teams; it is not
+recipient authorization. Leave link mode enabled if this sharing is unsuitable.
+
+**Implementation status:** authentication adapters are still deny-only stubs.
+This checkout is not a working production deployment yet. See the security pack.
 
 ## What it recognises
 
@@ -78,12 +90,13 @@ options generally do not unfurl at all.
 
 One difference may decide it regardless of features: a hosted bot holds an OAuth
 grant into your repositories and processes that data on vendor infrastructure.
-This runs in your own tenant, stores nothing, and holds no shared credential.
+The backend runs in your own infrastructure. In metadata mode it processes per-user
+GitLab tokens in memory; Microsoft stores the OAuth grants and posted Teams cards.
 See [`SECURITY-REVIEW.md`](SECURITY-REVIEW.md).
 
 ---
 
-## How it works
+## How metadata mode works
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
@@ -166,8 +179,8 @@ See [`SECURITY-REVIEW.md`](SECURITY-REVIEW.md).
   [7] the Adaptive Card returns to the thread everyone is reading.
 
   WHY IT MATTERS   [4] and [5] are why there is no database here: Microsoft
-                   holds the tokens. [6] is why one person can never see
-                   another person's projects - the call is made as them.
+                   holds the tokens. [6] limits what the sender may fetch; posted card details
+                   are then shared with the Teams conversation.
 ```
 
 ---
@@ -191,7 +204,7 @@ is.
 
 The short version: no shared credential, no database, no Graph permissions, and
 the request destination comes from your configuration rather than from the
-pasted link. Fifteen numbered invariants, each mapped to a test.
+pasted link. Implemented controls and outstanding deployment requirements are listed separately.
 
 ---
 
@@ -199,7 +212,7 @@ pasted link. Fifteen numbered invariants, each mapped to a test.
 
 - Node 22 or later
 - A GitLab instance, any tier. Free works. Self-managed works.
-- An Azure Bot Service registration. This is required for **any** Teams app,
+- An Azure Bot Service registration for this bot-based link extension,
   whichever cloud runs your compute.
 - A Teams administrator who can upload a custom app.
 
@@ -219,9 +232,8 @@ matches how you run GitLab. Each is a complete procedure.
 3. Name it `Teams Unfurl`.
 4. Set **Redirect URI** to your Bot Service redirect URI, which is
    `https://token.botframework.com/.auth/web/redirect`.
-5. Tick **Trusted**. This skips the per-user authorization screen, so your
-   people never see a consent prompt. It is the best experience available and
-   it is easy to miss.
+5. Leave **Trusted** off unless your GitLab security owner explicitly approves
+   skipping per-user OAuth consent for this broad read grant.
 6. Under **Scopes**, tick `read_api` only.
 7. Save. Keep the Application ID and Secret for step 2.
 
@@ -340,7 +352,7 @@ pnpm test
 pnpm typecheck
 ```
 
-146 tests, no network access needed. The security-critical code lives in
+Run the test suite without network access. The security-critical code lives in
 `packages/core`, which declares no dependency on Hono or the Teams SDK and can
 be tested with no server running.
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { handleQueryLink, EMPTY_RESPONSE, AUTH_RESPONSE } from '../src/handler.js';
 import { loadCoreConfig } from '@gitlab-unfurl-teams/core';
 
-const config = loadCoreConfig({ GITLAB_ORIGIN: 'https://gitlab.example.com' });
+const config = loadCoreConfig({ GITLAB_ORIGIN: 'https://gitlab.example.com', PREVIEW_MODE: 'metadata', PROJECT_ALLOWLIST: 'g,acquisition' });
 
 const activity = (url: string, userId = '29:user-a') => ({
   type: 'invoke',
@@ -169,5 +169,38 @@ describe('handleQueryLink', () => {
       { config, lookupToken: async () => null, log: (fields) => lines.push(fields) },
     );
     expect(lines[0]!.outcome).toContain('rejected-activity');
+  });
+});
+
+describe('metadata disclosure policy', () => {
+  it('never acquires a token or calls GitLab in default mode', async () => {
+    const lookupToken = vi.fn(async () => 'secret');
+    const fetchImpl = vi.fn(okFetch);
+    const result = await handleQueryLink(activity(`${good}/notes?secret=value#fragment`), {
+      config: loadCoreConfig({ GITLAB_ORIGIN: config.origin }), lookupToken, fetchImpl,
+    });
+    const json = JSON.stringify(result);
+    expect(lookupToken).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(json).toContain('GitLab link');
+    expect(json).toContain(good);
+    expect(json).not.toContain('Add the thing');
+    expect(json).not.toContain('"Ada"');
+    expect(json).not.toContain('secret');
+    expect(json).not.toContain('fragment');
+  });
+  it('does not fetch from an unapproved namespace in metadata mode', async () => {
+    const lookupToken = vi.fn(async () => 'secret');
+    expect(await handleQueryLink(activity('https://gitlab.example.com/other/project/-/issues/1'), {
+      config, lookupToken,
+    })).toEqual(EMPTY_RESPONSE);
+    expect(lookupToken).not.toHaveBeenCalled();
+  });
+  it('withholds a confidential issue even from an approved project', async () => {
+    const result = await handleQueryLink(activity(good), {
+      config, lookupToken: async () => 'secret',
+      fetchImpl: async () => new Response(JSON.stringify({ ...payload, confidential: true })),
+    });
+    expect(result).toEqual(EMPTY_RESPONSE);
   });
 });

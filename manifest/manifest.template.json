@@ -15,7 +15,7 @@
   },
   "description": {
     "short": "Preview GitLab merge requests, issues and epics in Teams.",
-    "full": "Turns a pasted GitLab merge request, issue or epic link into a card, using your own GitLab account. Each person sees only what they can already see in GitLab."
+    "full": "Adds a card for pasted GitLab merge request, issue and epic links. By default, details stay in GitLab. If your administrator enables metadata previews, details fetched using the sender's GitLab account are shared with everyone who can read the Teams message."
   },
   "icons": { "color": "color.png", "outline": "outline.png" },
   "accentColor": "#FC6D26",

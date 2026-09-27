@@ -3,6 +3,7 @@ export class ConfigError extends Error {
 }
 
 export interface CoreConfig {
+  readonly previewMode: 'link' | 'metadata';
   readonly origin: string;
   readonly projectAllowlist: readonly string[];
   readonly timeoutMs: number;
@@ -53,7 +54,20 @@ export function loadCoreConfig(env: Record<string, string | undefined>): CoreCon
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 
+  const previewMode = env.PREVIEW_MODE ?? 'link';
+  if (previewMode !== 'link' && previewMode !== 'metadata') {
+    throw new ConfigError('PREVIEW_MODE must be link or metadata');
+  }
+  if (projectAllowlist.some((entry) => !/^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)*$/.test(entry)
+    || entry.split('/').some((segment) => segment === '.' || segment === '..'))) {
+    throw new ConfigError('PROJECT_ALLOWLIST must contain namespace/project prefixes, not URLs or wildcards');
+  }
+  if (previewMode === 'metadata' && projectAllowlist.length === 0) {
+    throw new ConfigError('Metadata sharing requires a nonempty PROJECT_ALLOWLIST');
+  }
+
   return {
+    previewMode,
     origin,
     projectAllowlist,
     timeoutMs: TIMEOUT_MS,

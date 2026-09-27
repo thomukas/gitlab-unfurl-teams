@@ -50,3 +50,19 @@ describe('loadCoreConfig', () => {
     expect(c.maxResponseBytes).toBe(256 * 1024);
   });
 });
+
+describe('sharing policy', () => {
+  it('defaults to link mode without granting metadata access', () => {
+    expect(loadCoreConfig({}).previewMode).toBe('link');
+  });
+  it('requires an explicit nonempty approval list for metadata', () => {
+    expect(() => loadCoreConfig({ PREVIEW_MODE: 'metadata' })).toThrow(/nonempty/);
+    expect(loadCoreConfig({ PREVIEW_MODE: 'metadata', PROJECT_ALLOWLIST: 'acme/team' }).previewMode).toBe('metadata');
+  });
+  it.each(['all', '', 'METADATA'])('rejects ambiguous preview mode %s', (mode) => {
+    expect(() => loadCoreConfig({ PREVIEW_MODE: mode })).toThrow(/PREVIEW_MODE/);
+  });
+  it.each(['*', 'https://gitlab.com/g', 'g/../p', '/g/p', 'g//p'])('rejects unsafe allowlist %s', (entry) => {
+    expect(() => loadCoreConfig({ PROJECT_ALLOWLIST: entry })).toThrow(/PROJECT_ALLOWLIST/);
+  });
+});
