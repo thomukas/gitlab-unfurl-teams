@@ -4,6 +4,8 @@ import { isRecord, readBounded } from './http.js';
 
 export type AuthorizedActivity = (activity: unknown) => boolean;
 const JWKS_URL = 'https://login.botframework.com/v1/.well-known/keys';
+// Microsoft's rotating key set includes certificate chains and exceeds 256 KiB.
+const MAX_JWKS_BYTES = 2 * 1024 * 1024;
 
 /** Public-cloud Connector authentication. Emulator and unsigned local tokens are excluded. */
 export function createJwtVerifier(config: BotConfig, fetchImpl: typeof fetch = fetch) {
@@ -12,7 +14,7 @@ export function createJwtVerifier(config: BotConfig, fetchImpl: typeof fetch = f
     [customFetch]: async (url, options) => {
       const response = await fetchImpl(url, { ...options, redirect: 'error' });
       if (response.status !== 200) throw new Error('jwks-unavailable');
-      return new Response(await readBounded(response.body, 256 * 1024, options.signal));
+      return new Response(await readBounded(response.body, MAX_JWKS_BYTES, options.signal));
     },
   });
   return {
