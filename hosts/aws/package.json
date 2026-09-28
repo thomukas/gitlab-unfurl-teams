@@ -10,6 +10,6 @@
   "dependencies": {
     "@gitlab-unfurl-teams/app": "workspace:*",
     "@gitlab-unfurl-teams/core": "workspace:*",
-    "hono": "4.13.8"
+    "hono": "4.13.9"
   }
 }
